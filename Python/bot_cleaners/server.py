@@ -10,7 +10,7 @@ MAX_NUMBER_ROBOTS = 10
 def agent_portrayal(agent):
     if isinstance(agent, RobotLimpieza):
         return {"Shape": "circle", "Filled": "false", "Color": "black", "Layer": 0, "r": 1.0,
-                "text": f"{agent.banda_id}", "text_color": "yellow"}
+                "text": f"{agent.carga}", "text_color": "yellow"}
     elif isinstance(agent, Mueble):
         return {"Shape": "rect", "Filled": "true", "Color": "white", "Layer": 0,
                 "w": 0.9, "h": 0.9, "text_color": "Black", "text": f"{agent.unique_id}"}
@@ -55,6 +55,14 @@ model_params = {
         1,
         description="Escoge cuántos robots deseas implementar en el modelo",
     ),
+    "num_cajas": mesa.visualization.Slider(
+        "Número de Cajas",
+        5,
+        2,
+        15,
+        1,
+        description="Escoge cuántas cajas deseas implementar en el modelo",
+    ),
     "porc_celdas_sucias": mesa.visualization.Slider(
         "Porcentaje de Celdas Sucias",
         0.3,
@@ -83,5 +91,5 @@ model_params = {
 
 server = mesa.visualization.ModularServer(
     Habitacion, [grid],
-    "botCleaner", model_params, 8525
+    "botCleaner", model_params, 8526
 )
