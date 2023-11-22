@@ -9,8 +9,14 @@ MAX_NUMBER_ROBOTS = 10
 
 def agent_portrayal(agent):
     if isinstance(agent, RobotLimpieza):
-        return {"Shape": "circle", "Filled": "false", "Color": "black", "Layer": 0, "r": 1.0,
-                "text": f"{agent.carga}", "text_color": "yellow"}
+        portrayal = {"Shape": "circle", "Filled": "true", "Color": "black", "Layer": 0, "r": 1.0}
+        if agent.tiene_caja:
+            portrayal["Color"] = "black"
+            portrayal["text"] = "🤖📦"
+        else:
+            portrayal["Color"] = "black"
+            portrayal["text"] = "🤖"
+        return portrayal
     elif isinstance(agent, Mueble):
         return {"Shape": "rect", "Filled": "true", "Color": "white", "Layer": 0,
                 "w": 0.9, "h": 0.9, "text_color": "Black", "text": f"{agent.unique_id}"}
@@ -36,8 +42,21 @@ def agent_portrayal(agent):
             portrayal["text"] = f"{agent.unique_id}"
         return portrayal
     elif isinstance(agent, Estante):
-        return {"Shape": "rect", "Filled": "true", "Color": "grey", "Layer": 0,
-                "w": 0.9, "h": 0.9, "text": f"{agent.unique_id}", "text_color": "Black"}
+        portrayal = {"Shape": "rect", "Filled": "true", "Color": "grey", "Layer": 0, "w": 0.9, "h": 0.9, "text_color": "Black"}
+        if agent.cantidad_cajas == 0:
+            portrayal["Color"] = "grey"
+            portrayal["text"] = "🤡"
+        elif agent.cantidad_cajas == 1:
+            portrayal["Color"] = "grey"
+            portrayal["text"] = "📦"
+        elif agent.cantidad_cajas == 2:
+            portrayal["Color"] = "grey"
+            portrayal["text"] = "📦📦"
+        elif agent.cantidad_cajas == 3:
+            portrayal["Color"] = "grey"
+            portrayal["text"] = "📦📦📦"    
+        return portrayal
+    
     elif isinstance(agent, Caja):
         return {"Shape": "circle", "Filled": "true", "Color": "brown", "Layer": 2,
                 "w": 0.9, "h": 0.9, "text": "📦", "text_color": "Black"}

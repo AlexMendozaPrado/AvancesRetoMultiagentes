@@ -131,28 +131,30 @@ class RobotLimpieza(Agent):
 
                     # TODO: Robot en estación de recolección recoge la caja
                     # Si el robot es vecino de la caja con su ID, cambia la posicion de la caja a la misma posicion del robot
-                    for caja in self.model.schedule.agents:
-                        if isinstance(caja, Caja):
-                            if (self.son_vecinos_ortogonales(caja)):
-                                caja.pos = self.pos
-                                self.tiene_caja = True
-                                self.caja_cargando = caja
-                                for banda in self.model.bandas:
-                                    if banda.unique_id == self.banda_id:
-                                        banda.tiene_caja = False
-                                        banda.caja_recoger = None
-                                        break
+                    for caja in self.model.cajas:
+                        if isinstance(caja, Caja) and self.son_vecinos_ortogonales(caja):
+                            caja.pos = self.pos
+                            self.tiene_caja = True
+                            self.caja_cargando = caja
+                            for banda in self.model.bandas:
+                                if banda.unique_id == self.banda_id:
+                                    banda.tiene_caja = False
+                                    banda.caja_recoger = None
+                                    self.model.cajas.remove(caja)
+                                    break
 
                 else: # tiene caja, la deja en el estante y regresa a su banda
                     id_estante = self.caja_cargando.estante_id
                     for estante in self.model.estantes:
-                        if estante.unique_id == id_estante :
+                        if estante.unique_id == id_estante:
                             punto_estante_entrega = (estante.pos[0], estante.pos[1] + 1)
                             self.ruta_planeada = self.algoritmo_a_estrella(self.pos, punto_estante_entrega)
+                        if self.son_vecinos_ortogonales(estante):
                             self.tiene_caja = False
                             self.caja_cargando = None
                             estante.cantidad_cajas += 1
                             estante.cajas.append(self.caja_cargando)
+
                             
                 # TODO: Robot con caja se dirige a el estante con el ID de la caja
                 # Busca la posicion del estante con el mismo ID que la caja
@@ -521,6 +523,7 @@ class Habitacion(Model):
           self.porc_muebles = porc_muebles
           self.ids_estantes = []
           self.bandas = []
+          self.cajas = []
           self.estantes = []
           self.cajas_estante = {}
           self.grid = MultiGrid(M, N, False)
@@ -546,14 +549,16 @@ class Habitacion(Model):
           id_estante = None
           while True:
                 id_estante = random.choice(self.ids_estantes)
-                if id_estante not in self.cajas_estante or self.cajas_estante[id_estante] <= 3:
+                if id_estante not in self.cajas_estante or self.cajas_estante[id_estante] < 3:
                     break
           if id_estante not in self.cajas_estante:
                 self.cajas_estante[id_estante] = 1
           else:
                 self.cajas_estante[id_estante] += 1
+          print(self.cajas_estante)
           caja = Caja(self.next_id(), self, id_estante)
           self.num_cajas -= 1
+          self.cajas.append(caja)
           return caja
       
       def iniciar_robots(self):
