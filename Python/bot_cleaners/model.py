@@ -19,6 +19,7 @@ class Celda(Agent):
 class Caja(Agent):
     def __init__(self,unique_id,model, estante_id = None):
         super().__init__(unique_id,model)
+        self.pos = None
         self.sig_pos = None
         self.estante_id = estante_id
 
@@ -38,6 +39,7 @@ class Banda(Agent):
             nueva_caja = self.model.crear_caja()
             if nueva_caja:
                 self.model.poner_caja(self.pos, nueva_caja)
+                nueva_caja.pos = self.pos
                 self.tiene_caja = True
                 self.caja_recoger = nueva_caja
 
@@ -288,7 +290,13 @@ class RobotLimpieza(Agent):
 
         def detectar_colision(self, ruta_otro_robot):
             # Simple chequeo de colisión
-            return any(paso in ruta_otro_robot for paso in self.ruta_planeada) # Comprobar si hay algún paso en común
+
+            for idx in range(min(len(self.ruta_planeada), len(ruta_otro_robot))):
+                if ruta_otro_robot[idx] == self.ruta_planeada[idx]:
+                    return True
+            
+            return False
+
 
         def ir_a_estacion_carga(self):
             # Implementar la lógica para ir a la estación de carga más cercana
