@@ -17,11 +17,12 @@ class Celda(Agent):
         self.sucia = sucia
 
 class Caja(Agent):
-    def __init__(self,unique_id,model, estante_id = None):
+    def __init__(self,unique_id,model, estante_id = None, peso = 1):
         super().__init__(unique_id,model)
         self.pos = None
         self.sig_pos = None
         self.estante_id = estante_id
+        self.peso = peso
 
 
 class Estante(Agent):
@@ -348,7 +349,10 @@ class RobotLimpieza(Agent):
                     0 <= self.sig_pos[1] < self.model.grid.height):
                     self.model.grid.move_agent(self, self.sig_pos)
                     # Reducir la batería por movimiento
-                    self.carga -= 1
+                    if self.tiene_caja:
+                        self.carga -= self.caja_cargando.peso
+                    else:
+                        self.carga -= 1
                 else:
                     print(f"Posición inválida: {self.sig_pos}")
 
@@ -555,8 +559,8 @@ class Habitacion(Model):
                 self.cajas_estante[id_estante] = 1
           else:
                 self.cajas_estante[id_estante] += 1
-          print(self.cajas_estante)
-          caja = Caja(self.next_id(), self, id_estante)
+          peso_caja = random.randint(5, 8)
+          caja = Caja(self.next_id(), self, id_estante, peso_caja)
           self.num_cajas -= 1
           self.cajas.append(caja)
           return caja
@@ -565,7 +569,7 @@ class Habitacion(Model):
           for pos in self.posiciones_cargadores:
               next_id = self.next_id()
               id_estacion_robot = self.id_robot
-              self.id_robot += 1
+              self.id_robot += 1    
               if self.id_robot > 5:
                   self.id_robot = 1
               robot = RobotLimpieza(next_id, self, id_estacion_robot)

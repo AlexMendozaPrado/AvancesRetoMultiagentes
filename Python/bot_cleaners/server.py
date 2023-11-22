@@ -13,9 +13,11 @@ def agent_portrayal(agent):
         if agent.tiene_caja:
             portrayal["Color"] = "black"
             portrayal["text"] = "🤖📦"
+
         else:
             portrayal["Color"] = "black"
-            portrayal["text"] = "🤖"
+            portrayal["text_color"] = "white"
+            portrayal["text"] = f"🤖{agent.carga}"
         return portrayal
     elif isinstance(agent, Mueble):
         return {"Shape": "rect", "Filled": "true", "Color": "white", "Layer": 0,
