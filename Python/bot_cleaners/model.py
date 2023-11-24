@@ -472,6 +472,10 @@ class RobotLimpieza(Agent):
                         frontera.put((prioridad, siguiente))
                         camino[siguiente] = actual
 
+            #checar si en la ultima posicion del camino hay un robot
+            # if not self.model.grid.is_cell_empty(destino):
+            #     camino.pop(destino)
+
             return self.reconstruir_camino(camino, inicio, destino)
 
             
@@ -483,7 +487,9 @@ class RobotLimpieza(Agent):
 
         def obtener_vecinos(self, pos, evitar_obstaculos=True):
             vecinos = []
-            direcciones = [(0, 1), (1, 0), (0, -1), (-1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]  # Movimientos posibles
+#            direcciones = [(0, 1), (1, 0), (0, -1), (-1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]  # Movimientos posibles
+            direcciones = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # Movimientos posibles
+
             for dx, dy in direcciones:
                 x, y = pos[0] + dx, pos[1] + dy
                 if 0 <= x < self.model.grid.width and 0 <= y < self.model.grid.height:
@@ -516,7 +522,8 @@ class Habitacion(Model):
                    porc_celdas_sucias: float = 0.6,
                    porc_muebles: float = 0.1,
                    modo_pos_inicial: str = 'Fija',
-                   num_cajas: int = 8
+                   num_cajas: int = 8,
+                   num_estantes: int = 5
                     ):
           super().__init__()
           self.current_id = 0
@@ -535,6 +542,7 @@ class Habitacion(Model):
           self.posiciones_cargadores = []
           self.num_agentes = num_agentes
           self.id_robot = 1
+          self.num_estantes = num_estantes
 
           self.iniciar_bandas()
           self.iniciar_estantes()
@@ -591,13 +599,32 @@ class Habitacion(Model):
               self.grid.place_agent(cargador, pos)
 
       def iniciar_estantes(self):
-          posiciones_estantes = [(3,7), (5,7), (7, 7), (9, 7), (11, 7)]
-          for pos in posiciones_estantes:
+          x = 3
+          y = 0
+          if self.num_estantes > 10:
+              y = 10
+          elif self.num_estantes > 5 and self.num_estantes <= 10: 
+              y = 9
+          else:
+              y = 7
+
+          for i in range(self.num_estantes):
+              if i % 5 == 0 and i != 0:
+                  x = 3
+                  y -= 3
+              pos = (x, y)
               estante = Estante(self.next_id(), self, pos)
               self.grid.place_agent(estante, pos)
               self.schedule.add(estante)
               self.ids_estantes.append(estante.unique_id)
               self.estantes.append(estante)
+              x += 2
+        #   for pos in posiciones_estantes:
+        #       estante = Estante(self.next_id(), self, pos)
+        #       self.grid.place_agent(estante, pos)
+        #       self.schedule.add(estante)
+        #       self.ids_estantes.append(estante.unique_id)
+        #       self.estantes.append(estante)
       
       def iniciar_bandas(self):
           posiciones_banda_entrada = [(3,14), (5,14), (7,14), (9,14), (11,14)]

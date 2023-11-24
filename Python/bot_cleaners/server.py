@@ -76,35 +76,20 @@ model_params = {
         1,
         description="Escoge cuántos robots deseas implementar en el modelo",
     ),
-    "num_cajas": mesa.visualization.Slider(
-        "Número de Cajas",
+    "num_estantes": mesa.visualization.Slider(
+        "Número de estantes",
         5,
         2,
         15,
+        1
+    ),
+    "num_cajas": mesa.visualization.Slider(
+        "Número de Cajas",
+        5,
+        5,
+        30,
         1,
         description="Escoge cuántas cajas deseas implementar en el modelo",
-    ),
-    "porc_celdas_sucias": mesa.visualization.Slider(
-        "Porcentaje de Celdas Sucias",
-        0.3,
-        0.0,
-        0.75,
-        0.05,
-        description="Selecciona el porcentaje de celdas sucias",
-    ),
-    "porc_muebles": mesa.visualization.Slider(
-        "Porcentaje de Muebles",
-        0.1,
-        0.0,
-        0.25,
-        0.01,
-        description="Selecciona el porcentaje de muebles",
-    ),
-    "modo_pos_inicial": mesa.visualization.Choice(
-        "Posición Inicial de los Robots",
-        "Aleatoria",
-        ["Fija", "Aleatoria"],
-        "Selecciona la forma se posicionan los robots"
     ),
     "M": 15,
     "N": 15,
@@ -112,5 +97,5 @@ model_params = {
 
 server = mesa.visualization.ModularServer(
     Habitacion, [grid],
-    "botCleaner", model_params, 8526
+    "botCleaner", model_params, 8525
 )
