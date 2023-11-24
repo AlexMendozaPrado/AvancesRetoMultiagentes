@@ -127,6 +127,7 @@ class RobotLimpieza(Agent):
                             if banda.unique_id == self.banda_id:
                                 # Cambia banda.pos en y-1
                                 punto_recoleccion = (banda.pos[0], banda.pos[1] - 1)
+                                ##Verificar si robot tiene bateri disponible para ir por 
                                 self.ruta_planeada = self.algoritmo_a_estrella(self.pos, punto_recoleccion)                            
                                 break
 
