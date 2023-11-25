@@ -75,7 +75,7 @@ class Mueble(Agent):
 class RobotLimpieza(Agent):
         TIEMPO_ESPERA = 5  # Definir un tiempo de espera
         LIMITE_REPLANIFICACIONES = 100  # Definir un límite de replanificaciones
-        def __init__(self, unique_id, model, banda_id = None):
+        def __init__(self, unique_id, model, banda_id = None, estacion_carga_pos = None):
             super().__init__(unique_id, model)
             self.banda_id = banda_id
             self.sig_pos = None
@@ -87,10 +87,11 @@ class RobotLimpieza(Agent):
             self.estacion_carga = None  # Añadir para ubicar la estación de carga
             self.necesita_cargar = True  # Or some initial value based on your logic
             self.contador_replanificaciones = 0  # Inicializar el contador de replanificaciones
-            self.estacion_reservada = None
+            self.estacion_carga_propia = estacion_carga_pos
             self.estaciones_carga_reservadas = [] # Añadir para almacenar las estaciones reservadas
             self.tiene_caja = False
             self.caja_cargando = None
+            self.estacion_reservada = None
      
         def limpiar_celda_actual(self):
             contenido_celda_actual = self.model.grid.get_cell_list_contents(self.pos)
@@ -115,6 +116,13 @@ class RobotLimpieza(Agent):
             #             print(estante.pos)
             #             self.ruta_planeada = self.algoritmo_a_estrella(self.pos, punto_estante_entrega)       
             #             break
+            if self.carga < self.umbral_bateria and not self.estacion_reservada : 
+                self.necesita_cargar = True 
+                estacion_cercana = self.encontrar_estacion_carga_mas_cercana()
+                if estacion_cercana:
+                    self.reservar_estacion_carga(estacion_cercana)
+                    self.ruta_planeada = self.algoritmo_a_estrella(self.pos, estacion_cercana.pos)
+                    print(self.ruta_planeada)  # Imprime la ruta planeada
             # Planificar ruta hacia celda sucia si no hay ruta planeada
             if not self.ruta_planeada:
                 # TODO: Robot mas cercano se dirige a la banda de su ID
@@ -122,19 +130,25 @@ class RobotLimpieza(Agent):
                 # Imprime todos los ids de las bandas
                 
                 if not self.tiene_caja: # no tiene caja, se dirije a la banda
-                    for banda in self.model.schedule.agents:
-                        if isinstance(banda, Banda):
+                    #verificar si puede hacer todo el recorrido
+                    if self.puede_hacer_el_recorrido():
+                        #ir a la banda
+                        for banda in self.model.bandas:
                             if banda.unique_id == self.banda_id:
                                 # Cambia banda.pos en y-1
                                 punto_recoleccion = (banda.pos[0], banda.pos[1] - 1)
                                 ##Verificar si robot tiene bateri disponible para ir por 
-                                self.ruta_planeada = self.algoritmo_a_estrella(self.pos, punto_recoleccion)                            
+                                self.ruta_planeada = self.algoritmo_a_estrella(self.pos, punto_recoleccion)
                                 break
+                    else:
+                        #ir a cargarse
+                        self.ruta_planeada = self.algoritmo_a_estrella(self.pos, self.estacion_carga_propia)
+
 
                     # TODO: Robot en estación de recolección recoge la caja
                     # Si el robot es vecino de la caja con su ID, cambia la posicion de la caja a la misma posicion del robot
                     for caja in self.model.cajas:
-                        if isinstance(caja, Caja) and self.son_vecinos_ortogonales(caja):
+                        if self.son_vecinos_ortogonales(caja):
                             caja.pos = self.pos
                             self.tiene_caja = True
                             self.caja_cargando = caja
@@ -157,13 +171,10 @@ class RobotLimpieza(Agent):
                             estante.cantidad_cajas += 1
                             estante.cajas.append(self.caja_cargando)
 
-                            
-                # TODO: Robot con caja se dirige a el estante con el ID de la caja
-                # Busca la posicion del estante con el mismo ID que la caja
-
 
                 # TODO: Robot entrega la caja en el estante
                 #si tiene batteria para ir por la caja, dejarla, y luego cargarse, ir por la caja, si no cargarse
+
             else:
                 if self.tiene_caja:
                     for estante in self.model.estantes:
@@ -175,14 +186,9 @@ class RobotLimpieza(Agent):
                             estante.cajas.append(caja)
                             self.ruta_planeada = self.algoritmo_a_estrella(self.pos, self.estacion_reservada.pos)
                             break
+                        
+
             # Verificar nivel de batería y planificar ruta hacia estación de carga si es necesario
-            if self.carga < self.umbral_bateria and not self.estacion_reservada: 
-                self.necesita_cargar = True 
-                estacion_cercana = self.encontrar_estacion_carga_mas_cercana()
-                if estacion_cercana:
-                    self.reservar_estacion_carga(estacion_cercana)
-                    self.ruta_planeada = self.algoritmo_a_estrella(self.pos, estacion_cercana.pos)
-                    print(self.ruta_planeada)  # Imprime la ruta planeada
 
             # Mover el robot a lo largo de la ruta planeada
             self.mover_a_siguiente_posicion_en_ruta()
@@ -192,6 +198,44 @@ class RobotLimpieza(Agent):
             self.comunicar_ruta()
             self.actualizar_ruta()
             #self.resolver_deadlocks()
+
+        def puede_hacer_el_recorrido(self):
+            caja = self.obtener_caja()
+            if not caja:
+                return False
+            print("Caja: ", caja.pos)
+            ruta_hacia_banda = self.algoritmo_a_estrella(self.pos, caja.pos)
+            estante = self.obtener_estante(caja)
+            ruta_banda_estante = self.algoritmo_a_estrella(caja.pos, estante.pos)
+            print("Estante: ", estante.pos, " Cargador: ", self.estacion_carga_propia, " Caja: ", caja.pos)
+            #ruta_estante_cargador = self.algoritmo_a_estrella(estante.pos, self.estacion_carga_propia)
+            if len(ruta_hacia_banda) + (len(ruta_banda_estante) * caja.peso)  > self.carga:
+                return False
+            return True
+
+        def obtener_caja(self):
+            for banda in self.model.bandas:
+                if banda.unique_id == self.banda_id:
+                    return banda.caja_recoger
+            return None
+        
+
+        def obtener_estante(self, caja):
+            for estante in self.model.estantes:
+                if estante.unique_id == caja.estante_id:
+                    return estante
+            return None
+        
+
+        def resolver_deadlocks(self):
+            # Ejemplo de detección de deadlock
+            if self.contador_espera >= RobotLimpieza.TIEMPO_ESPERA:
+                # Lógica para resolver deadlock
+                self.contador_espera = 0
+                self.replanificar_ruta()
+            else:
+                # Continúa esperando
+                pass
 
         def son_vecinos_ortogonales(self, agente2):
             """
@@ -581,7 +625,8 @@ class Habitacion(Model):
               self.id_robot += 1    
               if self.id_robot > 5:
                   self.id_robot = 1
-              robot = RobotLimpieza(next_id, self, id_estacion_robot)
+              
+              robot = RobotLimpieza(next_id, self, id_estacion_robot, pos)
               self.grid.place_agent(robot, pos)
               self.schedule.add(robot)      
 
