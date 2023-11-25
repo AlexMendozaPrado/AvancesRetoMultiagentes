@@ -49,7 +49,10 @@ class Banda(Agent):
                 self.tiene_caja = True
                 self.caja_recoger = nueva_caja
 
-
+class BandaEntrega(Agent):
+    def __init__(self, unique_id: int, model: Model) -> None:
+        super().__init__(unique_id, model)
+        
 
 class EstacionCarga(Agent):
       def __init__(self, unique_id, model):
