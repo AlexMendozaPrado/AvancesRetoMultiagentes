@@ -75,7 +75,7 @@ class Mueble(Agent):
 class RobotLimpieza(Agent):
         TIEMPO_ESPERA = 5  # Definir un tiempo de espera
         LIMITE_REPLANIFICACIONES = 100  # Definir un límite de replanificaciones
-        def __init__(self, unique_id, model, banda_id = None, estacion_carga_pos = None):
+        def __init__(self, unique_id, model, banda_id = None, estacion_carga = None):
             super().__init__(unique_id, model)
             self.banda_id = banda_id
             self.sig_pos = None
@@ -87,11 +87,12 @@ class RobotLimpieza(Agent):
             self.estacion_carga = None  # Añadir para ubicar la estación de carga
             self.necesita_cargar = True  # Or some initial value based on your logic
             self.contador_replanificaciones = 0  # Inicializar el contador de replanificaciones
-            self.estacion_carga_propia = estacion_carga_pos
+            self.estacion_carga_propia = estacion_carga
             self.estaciones_carga_reservadas = [] # Añadir para almacenar las estaciones reservadas
             self.tiene_caja = False
             self.caja_cargando = None
             self.estacion_reservada = None
+            self.yendo_cargador = False
      
         def limpiar_celda_actual(self):
             contenido_celda_actual = self.model.grid.get_cell_list_contents(self.pos)
@@ -116,7 +117,7 @@ class RobotLimpieza(Agent):
             #             print(estante.pos)
             #             self.ruta_planeada = self.algoritmo_a_estrella(self.pos, punto_estante_entrega)       
             #             break
-            if self.carga < self.umbral_bateria and not self.estacion_reservada : 
+            if self.carga < self.umbral_bateria: 
                 self.necesita_cargar = True 
                 estacion_cercana = self.encontrar_estacion_carga_mas_cercana()
                 if estacion_cercana:
@@ -131,19 +132,19 @@ class RobotLimpieza(Agent):
                 
                 if not self.tiene_caja: # no tiene caja, se dirije a la banda
                     #verificar si puede hacer todo el recorrido
-                    if self.puede_hacer_el_recorrido():
-                        #ir a la banda
-                        for banda in self.model.bandas:
-                            if banda.unique_id == self.banda_id:
-                                # Cambia banda.pos en y-1
-                                punto_recoleccion = (banda.pos[0], banda.pos[1] - 1)
-                                ##Verificar si robot tiene bateri disponible para ir por 
-                                self.ruta_planeada = self.algoritmo_a_estrella(self.pos, punto_recoleccion)
-                                break
-                    else:
-                        #ir a cargarse
-                        self.ruta_planeada = self.algoritmo_a_estrella(self.pos, self.estacion_carga_propia)
+                    if not self.puede_hacer_el_recorrido():
+                        self.yendo_cargador = True
+                        self.ruta_planeada = self.algoritmo_a_estrella(self.pos, self.estacion_carga_propia.pos)
+                        self.yendo_cargador = False
+                        return
 
+                    for banda in self.model.bandas:
+                        if banda.unique_id == self.banda_id:
+                            # Cambia banda.pos en y-1
+                            punto_recoleccion = (banda.pos[0], banda.pos[1] - 1)
+                            ##Verificar si robot tiene bateri disponible para ir por 
+                            self.ruta_planeada = self.algoritmo_a_estrella(self.pos, punto_recoleccion)
+                            break
 
                     # TODO: Robot en estación de recolección recoge la caja
                     # Si el robot es vecino de la caja con su ID, cambia la posicion de la caja a la misma posicion del robot
@@ -203,15 +204,29 @@ class RobotLimpieza(Agent):
             caja = self.obtener_caja()
             if not caja:
                 return False
-            print("Caja: ", caja.pos)
-            ruta_hacia_banda = self.algoritmo_a_estrella(self.pos, caja.pos)
+            banda = self.obtener_banda()
+            punto_banda = (banda.pos[0], banda.pos[1] - 1)
+
+            ruta_hacia_banda = self.algoritmo_a_estrella(self.pos, punto_banda)
             estante = self.obtener_estante(caja)
-            ruta_banda_estante = self.algoritmo_a_estrella(caja.pos, estante.pos)
-            print("Estante: ", estante.pos, " Cargador: ", self.estacion_carga_propia, " Caja: ", caja.pos)
-            #ruta_estante_cargador = self.algoritmo_a_estrella(estante.pos, self.estacion_carga_propia)
-            if len(ruta_hacia_banda) + (len(ruta_banda_estante) * caja.peso)  > self.carga:
+            punto_estante_entrega = (estante.pos[0], estante.pos[1] + 1)
+
+            ruta_banda_estante = self.algoritmo_a_estrella(punto_banda, punto_estante_entrega)
+            self.yendo_cargador = True
+            ruta_estante_cargador = self.algoritmo_a_estrella(punto_estante_entrega, self.estacion_carga_propia.pos)
+
+            self.yendo_cargador = False
+            costo_total = len(ruta_hacia_banda) + (len(ruta_banda_estante) * caja.peso) + len(ruta_estante_cargador)
+            if costo_total > self.carga:
                 return False
+            print("Robot ", self.unique_id, " puede hacer el recorrido ", costo_total, " bateria disponible ", self.carga)
             return True
+
+        def obtener_banda(self):
+            for banda in self.model.bandas:
+                if banda.unique_id == self.banda_id:
+                    return banda
+            return None
 
         def obtener_caja(self):
             for banda in self.model.bandas:
@@ -226,7 +241,7 @@ class RobotLimpieza(Agent):
                     return estante
             return None
         
-
+        #codigo de copilot que igual y jala
         def resolver_deadlocks(self):
             # Ejemplo de detección de deadlock
             if self.contador_espera >= RobotLimpieza.TIEMPO_ESPERA:
@@ -284,15 +299,14 @@ class RobotLimpieza(Agent):
             en_estacion_carga = any(isinstance(obj, EstacionCarga) for obj in contenido_celda_actual)
             
             # Comprobar si hay una instancia de EstacionCarga en la celda
-            if en_estacion_carga:
-                print(f"Robot {self.unique_id} ha encontrado una estación de carga en la celda {self.pos}")
+            # if en_estacion_carga:
+            #     print(f"Robot {self.unique_id} ha encontrado una estación de carga en la celda {self.pos}")
             
             
             # Retorna True si está en una estación de carga
             return en_estacion_carga and self.carga < 100
         
-        
-        
+ 
         def comunicar_ruta(self):
              # Enviar información de ruta a otros robots
             for robot in self.model.schedule.agents:
@@ -509,7 +523,7 @@ class RobotLimpieza(Agent):
                 if actual == destino:
                     break
 
-                for siguiente in self.obtener_vecinos(actual):
+                for siguiente in self.obtener_vecinos(actual, destino):
                     nuevo_costo = costo_hasta_ahora[actual] + 1  # Assuming a uniform cost
                     if siguiente not in costo_hasta_ahora or nuevo_costo < costo_hasta_ahora[siguiente]:
                         costo_hasta_ahora[siguiente] = nuevo_costo
@@ -530,7 +544,7 @@ class RobotLimpieza(Agent):
 
 
 
-        def obtener_vecinos(self, pos, evitar_obstaculos=True):
+        def obtener_vecinos(self, pos, destino):
             vecinos = []
 #            direcciones = [(0, 1), (1, 0), (0, -1), (-1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]  # Movimientos posibles
             direcciones = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # Movimientos posibles
@@ -538,7 +552,7 @@ class RobotLimpieza(Agent):
             for dx, dy in direcciones:
                 x, y = pos[0] + dx, pos[1] + dy
                 if 0 <= x < self.model.grid.width and 0 <= y < self.model.grid.height:
-                    if evitar_obstaculos and self.model.grid.is_cell_empty((x, y)):
+                    if self.is_cell_empty((x, y)):
                         vecinos.append((x, y))
                         continue
                     
@@ -560,6 +574,28 @@ class RobotLimpieza(Agent):
                 actual = camino[actual]
             ruta.reverse()  # The path is reconstructed backwards, so we need to reverse it at the end
             return ruta
+        def is_cell_empty(self, pos):
+            """
+                    Comprueba si una celda está vacía o contiene ciertos tipos de agentes.
+                    :param pos: Tupla de posición (x, y).
+                    :return: True si la celda está "vacía" para los propósitos del robot.
+                    """
+            
+            cell_contents = self.model.grid.get_cell_list_contents(pos)
+
+            if not cell_contents:
+                return True  # La celda está literalmente vacía
+
+                    # Considera la celda "vacía" si solo contiene agentes que no bloquean el movimiento
+            for agent in cell_contents:
+                if self.yendo_cargador:
+                    if isinstance(agent, (Caja, Estante)) or (isinstance(agent, RobotLimpieza) and agent.unique_id != self.unique_id) or (isinstance(agent, EstacionCarga) and agent.unique_id != self.estacion_carga_propia.unique_id):
+                        return False
+                else:
+                    if isinstance(agent, (RobotLimpieza, Caja, Estante, EstacionCarga)):
+                        return False
+
+            return True  # La celda contiene agentes, pero son del tipo no bloqueante
 
 class Habitacion(Model):
       def __init__(self, M: int, N: int,
@@ -584,10 +620,11 @@ class Habitacion(Model):
           self.cajas_estante = {}
           self.grid = MultiGrid(M, N, False)
           self.schedule = SimultaneousActivation(self)
-          self.posiciones_cargadores = []
+          self.cargadores = []
           self.num_agentes = num_agentes
           self.id_robot = 1
           self.num_estantes = num_estantes
+          self.yendo_cargador = False
 
           self.iniciar_bandas()
           self.iniciar_estantes()
@@ -612,22 +649,22 @@ class Habitacion(Model):
                 self.cajas_estante[id_estante] = 1
           else:
                 self.cajas_estante[id_estante] += 1
-          peso_caja = random.randint(5, 8)
+          peso_caja = random.randint(2, 5)
           caja = Caja(self.next_id(), self, id_estante, peso_caja)
           self.num_cajas -= 1
           self.cajas.append(caja)
           return caja
       
       def iniciar_robots(self):
-          for pos in self.posiciones_cargadores:
+          for cargador in self.cargadores:
               next_id = self.next_id()
               id_estacion_robot = self.id_robot
               self.id_robot += 1    
               if self.id_robot > 5:
                   self.id_robot = 1
               
-              robot = RobotLimpieza(next_id, self, id_estacion_robot, pos)
-              self.grid.place_agent(robot, pos)
+              robot = RobotLimpieza(next_id, self, id_estacion_robot, cargador)
+              self.grid.place_agent(robot, cargador.pos)
               self.schedule.add(robot)      
 
       def iniciar_cargadores(self):
@@ -635,13 +672,12 @@ class Habitacion(Model):
           for i in range(self.num_agentes):
               if i % 2 == 0:
                   pos = (0, pos_y_cargador)
-                  self.posiciones_cargadores.append(pos)
               else:
                   pos = (14, pos_y_cargador)
-                  self.posiciones_cargadores.append(pos)
                   pos_y_cargador -= 2
 
               cargador = EstacionCarga(self.next_id(), self)
+              self.cargadores.append(cargador)
               self.grid.place_agent(cargador, pos)
 
       def iniciar_estantes(self):
@@ -687,15 +723,21 @@ class Habitacion(Model):
                 :return: True si la celda está "vacía" para los propósitos del robot.
                 """
           cell_contents = self.grid.get_cell_list_contents(pos)
+          print("en el is_cell_empty: ", self.yendo_cargador)
           if not cell_contents:
              return True  # La celda está literalmente vacía
 
                 # Considera la celda "vacía" si solo contiene agentes que no bloquean el movimiento
           for agent in cell_contents:
-              if isinstance(agent, (Mueble, RobotLimpieza, EstacionCarga)):
-                 return False  # La celda está bloqueada
+              if self.yendo_cargador:
+                if isinstance(agent, (RobotLimpieza, Caja, Estante)):
+                    return False
+              else:
+                if isinstance(agent, (RobotLimpieza, Caja, Estante, EstacionCarga)):
+                    return False
 
           return True  # La celda contiene agentes, pero son del tipo no bloqueante
+      
       def next_id(self):
             """ Returns the next available ID for a new agent. """
             self.current_id += 1
@@ -764,10 +806,3 @@ class Habitacion(Model):
                         # else:
                         #    return 0   
                        
-                   
-
-            
-
-            
-
-        

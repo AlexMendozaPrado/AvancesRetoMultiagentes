@@ -18,6 +18,7 @@ def agent_portrayal(agent):
             portrayal["Color"] = "black"
             portrayal["text_color"] = "white"
             portrayal["text"] = f"🤖{agent.carga}"
+            #portrayal["text"] = f"{agent.unique_id}"
         return portrayal
     elif isinstance(agent, Mueble):
         return {"Shape": "rect", "Filled": "true", "Color": "white", "Layer": 0,
@@ -97,5 +98,5 @@ model_params = {
 
 server = mesa.visualization.ModularServer(
     Habitacion, [grid],
-    "botCleaner", model_params, 8526
+    "botCleaner", model_params, 8525
 )
