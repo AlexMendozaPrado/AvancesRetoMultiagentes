@@ -65,7 +65,7 @@ def agent_portrayal(agent):
                 "w": 0.9, "h": 0.9, "text": "📦", "text_color": "Black"}
 
 grid = mesa.visualization.CanvasGrid(
-    agent_portrayal, 20, 20, 350, 350)
+    agent_portrayal, 15, 15, 350, 350)
 
 
 model_params = {

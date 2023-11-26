@@ -49,10 +49,7 @@ class Banda(Agent):
                 self.tiene_caja = True
                 self.caja_recoger = nueva_caja
 
-class BandaEntrega(Agent):
-    def __init__(self, unique_id: int, model: Model) -> None:
-        super().__init__(unique_id, model)
-        
+
 
 class EstacionCarga(Agent):
       def __init__(self, unique_id, model):
@@ -904,7 +901,7 @@ class Habitacion(Model):
         #       self.estantes.append(estante)
       
       def iniciar_bandas(self):
-          posiciones_banda_entrada = [(3,19), (5,19), (7,19), (9,19), (11,19)]
+          posiciones_banda_entrada = [(3,14), (5,14), (7,14), (9,14), (11,14)]
           for pos in posiciones_banda_entrada:
               banda = Banda(self.next_id(), self)
               self.grid.place_agent(banda, pos)
