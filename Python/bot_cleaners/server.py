@@ -17,7 +17,7 @@ def agent_portrayal(agent):
         else:
             portrayal["Color"] = "black"
             portrayal["text_color"] = "white"
-            portrayal["text"] = f"🤖{agent.carga}"
+            portrayal["text"] = f"{agent.unique_id}"
             #portrayal["text"] = f"{agent.unique_id}"
         return portrayal
     elif isinstance(agent, Mueble):
@@ -65,7 +65,7 @@ def agent_portrayal(agent):
                 "w": 0.9, "h": 0.9, "text": "📦", "text_color": "Black"}
 
 grid = mesa.visualization.CanvasGrid(
-    agent_portrayal, 15, 15, 350, 350)
+    agent_portrayal, 20, 20, 350, 350)
 
 
 model_params = {
@@ -88,7 +88,7 @@ model_params = {
         "Número de Cajas",
         5,
         5,
-        30,
+        45,
         1,
         description="Escoge cuántas cajas deseas implementar en el modelo",
     ),
@@ -98,5 +98,5 @@ model_params = {
 
 server = mesa.visualization.ModularServer(
     Habitacion, [grid],
-    "botCleaner", model_params, 8525
+    "botCleaner", model_params, 8526
 )
