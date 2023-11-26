@@ -18,6 +18,7 @@ def agent_portrayal(agent):
             portrayal["Color"] = "black"
             portrayal["text_color"] = "white"
             portrayal["text"] = f"🤖{agent.carga}"
+            
             #portrayal["text"] = f"{agent.unique_id}"
         return portrayal
     elif isinstance(agent, Mueble):
@@ -47,7 +48,7 @@ def agent_portrayal(agent):
     elif isinstance(agent, BandaEntrega):
         portrayal = {"Shape": "rect", "Filled": "true", "Layer": "1", "w": 0.9, "h": 0.9, "text_color": "Black"}
         portrayal["Color"] = "Purple"
-        portrayal["text"] = f"{agent.unique_id}"
+        portrayal["text"] = f"{agent.cantidad_cajas}"
         return portrayal
     elif isinstance(agent, Estante):
         portrayal = {"Shape": "rect", "Filled": "true", "Color": "grey", "Layer": 0, "w": 0.9, "h": 0.9, "text_color": "Black"}
