@@ -2,7 +2,7 @@ import random
 
 import mesa
 
-from .model import Habitacion, RobotLimpieza, Celda, Mueble, EstacionCarga, Banda, Estante, Caja
+from .model import Habitacion, RobotLimpieza, Celda, Mueble, EstacionCarga, Banda, Estante, Caja, BandaEntrega
 
 MAX_NUMBER_ROBOTS = 10
 
@@ -43,6 +43,11 @@ def agent_portrayal(agent):
         else:
             portrayal["Color"] = "Red"
             portrayal["text"] = f"{agent.unique_id}"
+        return portrayal
+    elif isinstance(agent, BandaEntrega):
+        portrayal = {"Shape": "rect", "Filled": "true", "Layer": "1", "w": 0.9, "h": 0.9, "text_color": "Black"}
+        portrayal["Color"] = "Purple"
+        portrayal["text"] = f"{agent.unique_id}"
         return portrayal
     elif isinstance(agent, Estante):
         portrayal = {"Shape": "rect", "Filled": "true", "Color": "grey", "Layer": 0, "w": 0.9, "h": 0.9, "text_color": "Black"}

@@ -630,11 +630,20 @@ class Habitacion(Model):
           self.yendo_cargador = False
 
           self.iniciar_bandas()
+          self.iniciar_bandas_entrega()
           self.iniciar_estantes()
           self.iniciar_cargadores()
           self.iniciar_robots()
         # Iniciar cajas
           
+      def iniciar_bandas_entrega(self):
+            posiciones_banda_entrega = [(3,0), (5,0), (7,0), (9,0), (11,0)]
+            for pos in posiciones_banda_entrega:
+                banda = BandaEntrega(self.next_id(), self)
+                self.grid.place_agent(banda, pos)
+                self.schedule.add(banda)
+                self.bandas.append(banda)
+
       def poner_caja(self, pos, caja):
             # self.grid.place_agent(caja, pos)
             self.schedule.add(caja)
