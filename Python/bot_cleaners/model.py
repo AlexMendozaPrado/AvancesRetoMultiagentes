@@ -6,7 +6,7 @@ from mesa.datacollection import DataCollector
 from collections import deque
 import math
 import random
-
+import requests
 
 
 import numpy as np
@@ -711,6 +711,7 @@ class Habitacion(Model):
           self.iniciar_estantes()
           self.iniciar_cargadores()
           self.iniciar_robots()
+
         # Iniciar cajas
           
       def iniciar_bandas_entrega(self):
@@ -720,7 +721,12 @@ class Habitacion(Model):
                 self.grid.place_agent(banda, pos)
                 self.schedule.add(banda)
                 self.bandas_entrega.append(banda)
+      
+      def get_grid(self):
+            return self.get_step_info()
 
+
+       
       def poner_caja(self, pos, caja):
             # self.grid.place_agent(caja, pos)
             self.schedule.add(caja)
@@ -858,6 +864,51 @@ class Habitacion(Model):
                     # Escoger una posición aleatoria de las disponibles
             return self.random.choice(posiciones_disponibles)
 
+      def get_robots_info(self, model: Model):
+            return [
+                {
+                    'id': agent.unique_id,
+                    'carga': agent.carga,
+                    'tiene_caja': agent.tiene_caja,
+                    'posicion': agent.pos
+                } for agent in model.schedule.agents if isinstance(agent, RobotLimpieza)
+            ]
+
+      def get_estantes_info(self):
+            return [
+                {
+                    'id': agent.unique_id,
+                    'cantidad_cajas': agent.cantidad_cajas,
+                    'posicion': agent.pos
+                } for agent in self.estantes
+            ]
+      
+      def get_bandas_arriba_info(self):
+            return [
+                {
+                    'id': banda.unique_id,
+                    'posicion': banda.pos,
+                    'tiene_caja': banda.tiene_caja
+                } for banda in self.bandas
+            ]
+      
+      def get_bandas_abajo_info(self):
+            return [
+                {
+                    'id': banda.unique_id,
+                    'posicion': banda.pos,
+                    'cantidad_cajas': banda.cantidad_cajas
+                } for banda in self.bandas_entrega
+            ]
+
+      def get_step_info(self):
+          data ={"robots": self.get_robots_info(self),
+                                 "estantes": self.get_estantes_info(),
+                                 "bandas_arriba": self.get_bandas_arriba_info(),
+                                 "bandas_abajo": self.get_bandas_abajo_info(),
+                }
+          return data
+
       def step(self):
           self.schedule.step()
 
@@ -867,18 +918,7 @@ class Habitacion(Model):
                         if isinstance(obj, Celda) and obj.sucia:
                             return False
             return True
-      @staticmethod
-      def get_grid(model: Model) -> np.ndarray:
-            grid = np.zeros((model.grid.width, model.grid.height))
-            for cell in model.grid.coord_iter():
-                cell_content, pos = cell
-                x, y = pos
-                for obj in cell_content:
-                    if isinstance(obj, RobotLimpieza):
-                       grid[x][y] = 2   
-                    elif isinstance(obj, Celda):
-                         grid[x][y] = int(obj.sucia)
-            return grid
+
       @staticmethod      
       def get_cargas(model: Model):
            return [(agent.unique_id, agent.carga) for agent in model.schedule.agents]

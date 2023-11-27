@@ -1,0 +1,24 @@
+﻿<Properties StartupConfiguration="{5FD112D4-ABDF-0DA7-8AF9-8BF63F763B67}|">
+  <MonoDevelop.Ide.Workbench ActiveDocument="Assets/GetSliderValues.cs">
+    <Files>
+      <File FileName="Assets/Simulate.cs" Line="8" Column="1" />
+      <File FileName="Assets/GetSliderValues.cs" Line="43" Column="27" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State name="__root__">
+          <Node name="Main Menu" expanded="True">
+            <Node name="Assets" expanded="True" selected="True" />
+          </Node>
+        </State>
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Release" />
+  <MonoDevelop.Ide.ItemProperties.Assembly-CSharp PreferredExecutionTarget="5fc1cf91-d304-4964-b39f-a2bd4b45847e" />
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MultiItemStartupConfigurations />
+</Properties>
