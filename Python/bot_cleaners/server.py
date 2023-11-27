@@ -14,12 +14,12 @@ def agent_portrayal(agent):
             portrayal["Color"] = "black"
             #portrayal["text"] = "🤖📦"
             portrayal["text_color"] = "white"
-            portrayal["text"] = f"🤖{agent.unique_id}"
+            portrayal["text"] = f"{agent.unique_id}"
 
         else:
             portrayal["Color"] = "black"
             portrayal["text_color"] = "white"
-            portrayal["text"] = f"🤖{agent.unique_id}"
+            portrayal["text"] = f"{agent.unique_id}"
             
             #portrayal["text"] = f"{agent.unique_id}"
         return portrayal
@@ -73,7 +73,7 @@ def agent_portrayal(agent):
                 "w": 0.9, "h": 0.9, "text": "📦", "text_color": "Black"}
 
 grid = mesa.visualization.CanvasGrid(
-    agent_portrayal, 15, 15, 350, 350)
+    agent_portrayal, 25, 25, 400, 400)
 
 
 model_params = {
@@ -100,8 +100,8 @@ model_params = {
         1,
         description="Escoge cuántas cajas deseas implementar en el modelo",
     ),
-    "M": 15,
-    "N": 15,
+    "M": 25,
+    "N": 25,
 } 
 
 server = mesa.visualization.ModularServer(

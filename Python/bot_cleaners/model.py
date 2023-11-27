@@ -1137,8 +1137,11 @@ class RobotLimpieza(Agent):
 
             if len(nuevas_colisiones) == 0 and len(nueva_ruta) > 0:
                 # Se encontro una ruta sin colisiones
-                
+                print("===========================================")
+                print("RUTA VALIDA TERMINADA")
+                print("===========================================")
                 for i in range(len(nuevas_colisiones)):
+
                     cell_contents = self.grid.get_cell_list_contents(nuevas_colisiones[i][1])
                     for agent in cell_contents:
                         if isinstance(agent, (Caja, Estante)) or (isinstance(agent, RobotLimpieza) and agent.unique_id != self.unique_id) or (isinstance(agent, EstacionCarga) and agent.unique_id != self.estacion_carga_propia.unique_id):
@@ -1149,6 +1152,9 @@ class RobotLimpieza(Agent):
                 self.ruta_planeada = nueva_ruta
             elif len(nueva_ruta) == 0:
                 # No se encontro una ruta sin colisiones, el robot debe esperar en su posicion actual hasta el proximo step
+                print("===========================================")
+                print("NO SE ENCONTRO UNA RUTA SIN COLISIONES")
+                print("===========================================")
                 self.ruta_planeada = [self.pos]
 
             print("===========================================")
@@ -1195,7 +1201,7 @@ class Habitacion(Model):
         # Iniciar cajas
           
       def iniciar_bandas_entrega(self):
-            posiciones_banda_entrega = [(3,0), (5,0), (7,0), (9,0), (11,0)]
+            posiciones_banda_entrega = [(6,0), (9,0), (12,0), (15,0), (18,0)]
             for pos in posiciones_banda_entrega:
                 banda = BandaEntrega(self.next_id(), self)
                 self.grid.place_agent(banda, pos)
@@ -1240,39 +1246,39 @@ class Habitacion(Model):
               self.schedule.add(robot)      
 
       def iniciar_cargadores(self):
-          pos_y_cargador = 11
+          pos_y_cargador = 18
           for i in range(self.num_agentes):
               if i % 2 == 0:
                   pos = (0, pos_y_cargador)
               else:
-                  pos = (14, pos_y_cargador)
-                  pos_y_cargador -= 2
+                  pos = (24, pos_y_cargador)
+                  pos_y_cargador -= 3
 
               cargador = EstacionCarga(self.next_id(), self)
               self.cargadores.append(cargador)
               self.grid.place_agent(cargador, pos)
 
       def iniciar_estantes(self):
-          x = 3
+          x = 6
           y = 0
           if self.num_estantes > 10:
-              y = 10
+              y = 17
           elif self.num_estantes > 5 and self.num_estantes <= 10: 
-              y = 9
+              y = 16
           else:
-              y = 7
+              y = 14
 
           for i in range(self.num_estantes):
               if i % 5 == 0 and i != 0:
-                  x = 3
-                  y -= 3
+                  x = 6
+                  y -= 4
               pos = (x, y)
               estante = Estante(self.next_id(), self, pos)
               self.grid.place_agent(estante, pos)
               self.schedule.add(estante)
               self.ids_estantes.append(estante.unique_id)
               self.estantes.append(estante)
-              x += 2
+              x += 3
         #   for pos in posiciones_estantes:
         #       estante = Estante(self.next_id(), self, pos)
         #       self.grid.place_agent(estante, pos)
@@ -1281,7 +1287,7 @@ class Habitacion(Model):
         #       self.estantes.append(estante)
       
       def iniciar_bandas(self):
-          posiciones_banda_entrada = [(3,14), (5,14), (7,14), (9,14), (11,14)]
+          posiciones_banda_entrada = [(6,24), (9,24), (12,24), (15,24), (18,24)]
           for pos in posiciones_banda_entrada:
               banda = Banda(self.next_id(), self)
               self.grid.place_agent(banda, pos)
