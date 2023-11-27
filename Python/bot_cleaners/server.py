@@ -104,5 +104,5 @@ model_params = {
 
 server = mesa.visualization.ModularServer(
     Habitacion, [grid],
-    "botCleaner", model_params, 8526
+    "botCleaner", model_params, 8524
 )
