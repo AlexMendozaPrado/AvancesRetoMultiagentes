@@ -256,7 +256,7 @@ class RobotLimpieza(Agent):
 
             # Mover el robot a lo largo de la ruta planeada
             self.mover_a_siguiente_posicion_en_ruta()
-            self.limpiar_celda_actual()  # Limpia la celda si es necesario
+            # self.limpiar_celda_actual()  # Limpia la celda si es necesario
             # Comunicar ruta y resolver conflictos (aunque en tu caso no se comuniquen)
             # Suponiendo que tienes una función para comunicar la ruta planeada
             self.comunicar_ruta()
@@ -398,14 +398,24 @@ class RobotLimpieza(Agent):
 
         def recibir_ruta(self, ruta_otro_robot, otro_robot):
             # Detectar colisión y negociar una nueva ruta si es necesario
-            if self.detectar_colision(ruta_otro_robot):
-               self.resolver_conflicto(otro_robot)
+            # colision[0]: indica si hubo colision o no
+            # colision[1]: indice donde ocurre la colision
+            # colision[2]: lugar donde ocurre la colision
+            colision = self.detectar_colision(ruta_otro_robot)
+            # Extraer coordenadas donde ocurre colision
+            if colision[0]:
+               print("=======================================")
+               print("COLISION DETECTADA ENTRE EL ROBOT", self.unique_id, "y", otro_robot.unique_id, "en los lugares", self.ruta_planeada[colision[1]], "y", otro_robot.ruta_planeada[colision[1]])
+               print("=======================================")
+               # Mandar a esta funcion coordenadas donde ocurre la colision
+               self.resolver_conflicto(otro_robot, colision)
             # Comprobar si la ruta recibida incluye la estación de carga que este robot ha reservado
             elif any(estacion for estacion in self.model.estaciones_carga if estacion.pos in ruta_otro_robot and estacion.reservada and estacion.robot_reservante == self):
                 self.resolver_conflicto(otro_robot)  # Considerar esto como un conflicto y replanificar la ruta
 
-        def resolver_conflicto(self, otro_robot):
-
+        def resolver_conflicto(self, otro_robot, colision):
+            
+            """
             if self.estacion_reservada and self.estacion_reservada.reservada and self.estacion_reservada.robot_reservante != self:
                 # Si la estación de carga está reservada por otro robot, replanificar sin incrementar el contador
                 self.replanificar_ruta()
@@ -421,6 +431,486 @@ class RobotLimpieza(Agent):
                 # Acción alternativa: esperar o cambiar ruta
                 self.esperar_o_cambiar_ruta()
                 self.contador_replanificaciones = 0
+            """
+
+            """
+            REGLAS DE NEGOCIACION
+
+            1. Un robot va a su estacion de carga, el otro no:
+               1.1. Si el otro robot no va a su estacion de carga ni tiene caja se le cede el paso al robot que va a su estacion de carga
+                1.2. Si el otro robot tiene una caja se le cede el paso a ese robot
+                1.3. Ambos robots van a sus estaciones de carga:
+                    1.3.1. Se le cede el paso  al robot que tenga menos bateria
+                    1.3.2. Si ambos robots tienen la misma bateria:
+                        1.3.2.1. Se le cede el paso al robot que tenga mas replanificaciones
+                        1.3.2.2. Si ambos tienen la misma cantidad de replanificaciones se le cede el paso al robot con el menor id
+
+            2. Ambos robots cargan una caja:
+                2.1. Se le cede el paso al robot con la caja mas pesada
+                2.2. Ambos robots tienen una caja del mismo peso:
+                    2.2.1. Se le cede el paso al robot que tenga menos bateria
+                    2.2.2. Si ambos robots tienen la misma bateria:
+                        2.2.2.1. Se le cede el paso al robot que tenga mas replanificaciones
+                        2.2.2.2. Si ambos tienen la misma cantidad de replanificaciones se le cede el paso al robot con el menor id
+
+            3. Uno de los robots esta desocupado:
+                3.1. Si el otro robot esta cargando una caja se le cede el paso a ese robot
+                3.2. Si el otro robot no esta ocupado ni necesita ir a su estacion de carga se le cede el paso al que tenga menos bateria
+                3.3. Si ambos tienen la misma bateria:
+                    3.3.1. Se le cede el paso al robot con menos bateria
+                    3.3.2. Si ambos robots tienen la misma bateria:
+                        3.3.2.1. Se le cede el paso al robot que tenga mas replanificaciones
+                        3.3.2.2. Si ambos tienen la misma cantidad de replanificaciones se le cede el paso al robot con el menor id
+
+            NOTA IMPORTANTE: AL FINALIZAR LA MODIFICACION DE LA RUTA DE UN ROBOT VOLVER A LLAMAR LA FUNCION self.comunicar_ruta()
+
+            CASOS EXTREMOS NO RESUELTOS:
+
+            2 robots en camino a la misma estacion de carga y el punto de colision es justo enfrente de la banda de tal modo que uno
+            queda enfrente de la banda y otro queda atras porque se freno para no colisionar. Despues de que el robot de la banda
+            recoge su caja no puede moverse porque el robot de atras esta ocupando su espacio y ese robot necesita recoger una caja
+            de la banda. En este caso no funciona el frenado de uno de los 2 robots, se necesita replanificar las rutas de ambos 
+            ignorando las posiciones ocupadas del mapa.
+
+            
+            Hay 2 robots:
+            * 1. Esta en cualquier estado (cargando, yendo a recoger una caja o yendo a su estacion de carga)
+            * 2. Esta yendo a recoger una caja o cargando una caja
+            Si el robot 2 tiene prioridad el robot 1 debe ceder el paso. En algunos casos es suficiente que el robot que cede solo
+            espere 1 step parado pero en otros es necesario que espere 2 steps porque si el camino del robot 1 se atraviesa con el
+            camino del robot 2 puede suceder que el robot 2 tenga que dejar una caja, en ese caso el robot 1 debe esperar a que el 2
+            vaya a su posicion (acaba de ceder para evitar colision) y que en el siguiente step el robot 2 deje la caja (el robot 1
+            volvio a ceder para no chocar con el robot 1).
+
+            Una posible explicacion es que cuando un robot recoge/deja una caja despues de recogerla/dejarla replanifica su nueva
+            ruta en el mismo step y en el siguiente la nueva ruta incluye ese espacio donde recogio/dejo la caja. Falta experimentar
+            si eso sucede solo al momento de dejar una caja o tambien al recogerla y si se debe a la funcion de resolver_conflicto
+            o no.
+
+            Al recoger una caja solo llega al lugar, recoge y se mueve, pero al dejar una caja llega al lugar, deja la caja y a veces
+            se mueve pero otras veces despues de dejar la caja se queda quieta en su posicion otro step y luego se mueve. En teoria
+            solo deberia llegar al lugar, dejar la caja y luego moverse no esperar en el mismo lugar otro step despues de dejar la
+            caja.
+            """
+
+            indice_colision = colision[1]
+            lugar_colision = colision[2]
+            
+            """
+            # 1
+            if ((self.ruta_planeada[-1] == self.estacion_carga_propia.pos and otro_robot.ruta_planeada[-1] != otro_robot.estacion_carga_propia.pos) or (self.ruta_planeada[-1] != self.estacion_carga_propia.pos and otro_robot.ruta_planeada[-1] == otro_robot.estacion_carga_propia.pos)):
+                # 1.1
+                if ((self.ruta_planeada[-1] == self.estacion_carga_propia.pos) and (otro_robot.ruta_planeada[-1] != otro_robot.estacion_carga_propia.pos) and (otro_robot.tiene_caja == False)):
+                    # Debe ceder el otro robot (esta desocupado)
+                    print("==========================================")
+                    print("COLISION EN EL CASO 1.1")
+                    print("==========================================")
+                    if indice_colision > 0:
+                        posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                    else:
+                        posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                    # Llamar algoritmo estrella pasandole la posicion en coordenadas donde choca el robot
+                    otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                    otro_robot.contador_replanificaciones += 1
+                    otro_robot.comunicar_ruta()
+                    return
+                elif ((otro_robot.ruta_planeada[-1] == otro_robot.estacion_carga_propia.pos) and (self.ruta_planeada[-1] != self.estacion_carga_propia.pos) and (self.tiene_caja == False)):
+                    # Debe ceder el robot actual (esta desocupado)
+                    print("==========================================")
+                    print("COLISION EN EL CASO 1.1")
+                    print("==========================================")
+                    if indice_colision > 0:
+                        posicion_freno = self.ruta_planeada[indice_colision - 1]
+                    else:
+                        posicion_freno = self.ruta_planeada[indice_colision]
+                    self.ruta_planeada.insert(indice_colision, posicion_freno)
+                    self.contador_replanificaciones += 1
+                    self.comunicar_ruta()
+                    return
+                
+                # 1.2
+                if ((self.ruta_planeada[-1] == self.estacion_carga_propia.pos) and (otro_robot.ruta_planeada[-1] != otro_robot.estacion_carga_propia.pos) and (otro_robot.tiene_caja == True)):
+                    # Debe ceder el robot actual porque el otro tiene caja
+                    print("==========================================")
+                    print("COLISION EN EL CASO 1.2")
+                    print("==========================================")
+                    if indice_colision > 0:
+                        posicion_freno = self.ruta_planeada[indice_colision - 1]
+                    else:
+                        posicion_freno = self.ruta_planeada[indice_colision]
+                    self.ruta_planeada.insert(indice_colision, posicion_freno)
+                    self.contador_replanificaciones += 1
+                    self.comunicar_ruta()
+                    return
+                elif((otro_robot.ruta_planeada[-1] == otro_robot.estacion_carga_propia.pos) and (self.ruta_planeada[-1] != self.estacion_carga_propia.pos) and (self.tiene_caja == True)):
+                    # Debe ceder el otro robot porque el actual tiene caja
+                    print("==========================================")
+                    print("COLISION EN EL CASO 1.2")
+                    print("==========================================")
+                    if indice_colision > 0:
+                        posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                    else:
+                        posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                    otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                    otro_robot.contador_replanificaciones += 1
+                    otro_robot.comunicar_ruta()
+                    return
+                
+                # 1.3
+                if ((self.ruta_planeada[-1] == self.estacion_carga_propia.pos) and (otro_robot.ruta_planeada[-1] == otro_robot.estacion_carga_propia.pos)):
+                    # 1.3.1
+                    if (self.carga < otro_robot.carga):
+                        # Debe ceder el otro robot porque el actual tiene menos bateria
+                        print("==========================================")
+                        print("COLISION EN EL CASO 1.3.1")
+                        print("==========================================")
+                        if indice_colision > 0:
+                            posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                        else:
+                            posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                        otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                        otro_robot.contador_replanificaciones += 1
+                        otro_robot.comunicar_ruta()
+                        return
+                    elif (self.carga > otro_robot.carga):
+                        # Debe ceder el robot actual porque el otro tiene menos bateria
+                        print("==========================================")
+                        print("COLISION EN EL CASO 1.3.1")
+                        print("==========================================")
+                        if indice_colision > 0:
+                            posicion_freno = self.ruta_planeada[indice_colision - 1]
+                        else:
+                            posicion_freno = self.ruta_planeada[indice_colision]
+                        self.ruta_planeada.insert(indice_colision, posicion_freno)
+                        self.contador_replanificaciones += 1
+                        self.comunicar_ruta()
+                        return
+
+                    # 1.3.2
+                    if (self.carga == otro_robot.carga):
+                        # 1.3.2.1
+                        if (self.contador_replanificaciones < otro_robot.contador_replanificaciones):
+                            # Debe ceder el robot actual porque el otro tiene mas replanificaciones
+                            print("==========================================")
+                            print("COLISION EN EL CASO 1.3.2")
+                            print("==========================================")
+                            if indice_colision > 0:
+                                posicion_freno = self.ruta_planeada[indice_colision - 1]
+                            else:
+                                posicion_freno = self.ruta_planeada[indice_colision]
+                            self.ruta_planeada.insert(indice_colision, posicion_freno)
+                            self.contador_replanificaciones += 1
+                            self.comunicar_ruta()
+                            return
+                        elif (self.contador_replanificaciones > otro_robot.contador_replanificaciones):
+                            # Debe ceder el otro robot porque el actual tiene mas replanificaciones
+                            print("==========================================")
+                            print("COLISION EN EL CASO 1.3.2")
+                            print("==========================================")
+                            if indice_colision > 0:
+                                posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                            else:
+                                posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                            otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                            otro_robot.contador_replanificaciones += 1
+                            otro_robot.comunicar_ruta()
+                            return
+                        
+                        # 1.3.2.2
+                        if (self.contador_replanificaciones == otro_robot.contador_replanificaciones):
+                            if (self.unique_id < otro_robot.unique_id):
+                                # Debe ceder el otro robot porque tiene el id mas grande
+                                print("==========================================")
+                                print("COLISION EN EL CASO 1.3.2.2")
+                                print("==========================================")
+                                if indice_colision > 0:
+                                    posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                                else:
+                                    posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                                otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                                otro_robot.contador_replanificaciones += 1
+                                otro_robot.comunicar_ruta()
+                                return
+                            else:
+                                # Debe ceder el robot actual porque tiene el id mas grande
+                                print("==========================================")
+                                print("COLISION EN EL CASO 1.3.2.2")
+                                print("==========================================")
+                                if indice_colision > 0:
+                                    posicion_freno = self.ruta_planeada[indice_colision - 1]
+                                else:
+                                    posicion_freno = self.ruta_planeada[indice_colision]
+                                self.ruta_planeada.insert(indice_colision, posicion_freno)
+                                self.contador_replanificaciones += 1
+                                self.comunicar_ruta()
+                                return
+                return
+            """
+
+            """
+            # 2
+            if ((self.tiene_caja == True) and (otro_robot.tiene_caja == True)):
+                # 2.1
+                if (self.caja_cargando.peso > otro_robot.caja_cargando.peso):
+                    # Debe ceder el otro robot porque el actual tiene la caja mas pesada
+                    print("==========================================")
+                    print("COLISION EN EL CASO 2.1")
+                    print("==========================================")
+                    if indice_colision > 0:
+                        posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                    else:
+                        posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                    otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                    otro_robot.contador_replanificaciones += 1
+                    otro_robot.comunicar_ruta()
+                    print("==========================================")
+                    print("RECURSION TERMINADA")
+                    print("==========================================")
+                    return
+                elif (self.caja_cargando.peso < otro_robot.caja_cargando.peso):
+                    # Debe ceder el robot actual porque el otro tiene la caja mas pesada
+                    print("==========================================")
+                    print("COLISION EN EL CASO 2.1")
+                    print("==========================================")
+                    if indice_colision > 0:
+                        posicion_freno = self.ruta_planeada[indice_colision - 1]
+                    else:
+                        posicion_freno = self.ruta_planeada[indice_colision]
+                    self.ruta_planeada.insert(indice_colision, posicion_freno)
+                    self.contador_replanificaciones += 1
+                    self.comunicar_ruta()
+                    print("==========================================")
+                    print("RECURSION TERMINADA")
+                    print("==========================================")
+                    return
+                
+                # 2.2
+                if (self.caja_cargando.peso == otro_robot.caja_cargando.peso):
+
+                    # 2.2.1
+                    if (self.carga < otro_robot.carga):
+                        # Debe ceder el otro robot porque el actual tiene menos bateria
+                        print("==========================================")
+                        print("COLISION EN EL CASO 2.2.1")
+                        print("==========================================")
+                        if indice_colision > 0:
+                            posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                        else:
+                            posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                        otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                        otro_robot.contador_replanificaciones += 1
+                        otro_robot.comunicar_ruta()
+                        print("==========================================")
+                        print("RECURSION TERMINADA")
+                        print("==========================================")
+                        return
+                    elif (self.carga > otro_robot.carga):
+                        # Debe ceder el robot actual porque el otro tiene menos bateria
+                        print("==========================================")
+                        print("COLISION EN EL CASO 2.2.1")
+                        print("==========================================")
+                        if indice_colision > 0:
+                            posicion_freno = self.ruta_planeada[indice_colision - 1]
+                        else:
+                            posicion_freno = self.ruta_planeada[indice_colision]
+                        self.ruta_planeada.insert(indice_colision, posicion_freno)
+                        self.contador_replanificaciones += 1
+                        self.comunicar_ruta()
+                        print("==========================================")
+                        print("RECURSION TERMINADA")
+                        print("==========================================")
+                        return
+                    
+                    # 2.2.2
+                    if (self.carga == otro_robot.carga):
+                        # 2.2.2.1
+                        if (self.contador_replanificaciones < otro_robot.contador_replanificaciones):
+                            # Debe ceder el robot actual porque el otro tiene mas replanificaciones
+                            print("==========================================")
+                            print("COLISION EN EL CASO 2.2.2.1")
+                            print("==========================================")
+                            if indice_colision > 0:
+                                posicion_freno = self.ruta_planeada[indice_colision - 1]
+                            else:
+                                posicion_freno = self.ruta_planeada[indice_colision]
+                            self.ruta_planeada.insert(indice_colision, posicion_freno)
+                            self.contador_replanificaciones += 1
+                            self.comunicar_ruta()
+                            return
+                        elif (self.contador_replanificaciones > otro_robot.contador_replanificaciones):
+                            # Debe ceder el otro robot porque el actual tiene mas replanificaciones
+                            print("==========================================")
+                            print("COLISION EN EL CASO 2.2.2.1")
+                            print("==========================================")
+                            if indice_colision > 0:
+                                posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                            else:
+                                posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                            otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                            otro_robot.contador_replanificaciones += 1
+                            otro_robot.comunicar_ruta()
+                            return
+                        
+                        # 2.2.2.2
+                        if (self.contador_replanificaciones == otro_robot.contador_replanificaciones):
+                            if (self.unique_id < otro_robot.unique_id):
+                                # Debe ceder el otro robot porque tiene el id mas grande
+                                print("==========================================")
+                                print("COLISION EN EL CASO 2.2.2.2")
+                                print("==========================================")
+                                if indice_colision > 0:
+                                    posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                                else:
+                                    posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                                otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                                otro_robot.contador_replanificaciones += 1
+                                otro_robot.comunicar_ruta()
+                                return
+                            else:
+                                # Debe ceder el robot actual porque tiene el id mas grande
+                                print("==========================================")
+                                print("COLISION EN EL CASO 2.2.2.2")
+                                print("==========================================")
+                                if indice_colision > 0:
+                                    posicion_freno = self.ruta_planeada[indice_colision - 1]
+                                else:
+                                    posicion_freno = self.ruta_planeada[indice_colision]
+                                self.ruta_planeada.insert(indice_colision, posicion_freno)
+                                self.contador_replanificaciones += 1
+                                self.comunicar_ruta()
+                                return
+                return
+            """
+
+            # 3
+            if ((self.ruta_planeada[-1] != self.estacion_carga_propia.pos and self.tiene_caja == False) or (otro_robot.ruta_planeada[-1] != otro_robot.estacion_carga_propia.pos and otro_robot.tiene_caja == False)):
+                # 3.1
+                if (self.tiene_caja == True and otro_robot.tiene_caja == False):
+                    # Debe ceder el otro robot porque el actual esta cargando una caja
+                    print("==========================================")
+                    print("COLISION EN EL CASO 3.1")
+                    print("==========================================")
+                    if indice_colision > 0:
+                        posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                    else:
+                        posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                    otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                    # otro_robot.ruta_planeada = otro_robot.replanificacion_a_estrella(otro_robot.pos, otro_robot.ruta_planeada[-1], colision)
+                    otro_robot.contador_replanificaciones += 1
+                    otro_robot.comunicar_ruta()
+                    return
+                elif(self.tiene_caja == False and otro_robot.tiene_caja == True):
+                    # Debe ceder el robot actual porque el otro esta cargando una caja
+                    print("==========================================")
+                    print("COLISION EN EL CASO 3.1")
+                    print("==========================================")
+                    if indice_colision > 0:
+                        posicion_freno = self.ruta_planeada[indice_colision - 1]
+                    else:
+                        posicion_freno = self.ruta_planeada[indice_colision]
+                    self.ruta_planeada.insert(indice_colision, posicion_freno)
+                    # self.ruta_planeada = self.replanificacion_a_estrella(self.pos, self.ruta_planeada[-1], colision)
+                    self.contador_replanificaciones += 1
+                    self.comunicar_ruta()
+                    return
+
+                # 3.2
+                if (self.tiene_caja == False and otro_robot.tiene_caja == False):
+                    if (self.carga < otro_robot.carga):
+                        # Debe ceder el otro robot porque el actual tiene menos bateria
+                        print("==========================================")
+                        print("COLISION EN EL CASO 3.2")
+                        print("==========================================")
+                        if indice_colision > 0:
+                            posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                        else:
+                            posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                        otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                        # otro_robot.ruta_planeada = otro_robot.replanificacion_a_estrella(otro_robot.pos, otro_robot.ruta_planeada[-1], colision)
+                        otro_robot.contador_replanificaciones += 1
+                        otro_robot.comunicar_ruta()
+                        return
+                    elif (self.carga > otro_robot.carga):
+                        # Debe ceder el robot actual porque el otro tiene menos bateria
+                        print("==========================================")
+                        print("COLISION EN EL CASO 3.2")
+                        print("==========================================")
+                        if indice_colision > 0:
+                            posicion_freno = self.ruta_planeada[indice_colision - 1]
+                        else:
+                            posicion_freno = self.ruta_planeada[indice_colision]
+                        self.ruta_planeada.insert(indice_colision, posicion_freno)
+                        # self.ruta_planeada = self.replanificacion_a_estrella(self.pos, self.ruta_planeada[-1], colision)
+                        self.contador_replanificaciones += 1
+                        self.comunicar_ruta()
+                        return
+
+                    # 3.3
+                    if (self.carga == otro_robot.carga):
+                        # 3.3.1
+                        if (self.contador_replanificaciones < otro_robot.contador_replanificaciones):
+                            # Debe ceder el robot actual porque el otro tiene mas replanificaciones
+                            print("==========================================")
+                            print("COLISION EN EL CASO 3.3.1")
+                            print("==========================================")
+                            if indice_colision > 0:
+                                posicion_freno = self.ruta_planeada[indice_colision - 1]
+                            else:
+                                posicion_freno = self.ruta_planeada[indice_colision]
+                            self.ruta_planeada.insert(indice_colision, posicion_freno)
+                            # self.ruta_planeada = self.replanificacion_a_estrella(self.pos, self.ruta_planeada[-1], colision)
+                            self.contador_replanificaciones += 1
+                            self.comunicar_ruta()
+                            return
+                        elif (self.contador_replanificaciones > otro_robot.contador_replanificaciones):
+                            # Debe ceder el otro robot porque el actual tiene mas replanificaciones
+                            print("==========================================")
+                            print("COLISION EN EL CASO 3.3.1")
+                            print("==========================================")
+                            if indice_colision > 0:
+                                posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                            else:
+                                posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                            otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                            # otro_robot.ruta_planeada = otro_robot.replanificacion_a_estrella(otro_robot.pos, otro_robot.ruta_planeada[-1], colision)
+                            otro_robot.contador_replanificaciones += 1
+                            otro_robot.comunicar_ruta()
+                            return
+                        
+                        # 3.3.2
+                        if (self.contador_replanificaciones == otro_robot.contador_replanificaciones):
+                            if (self.unique_id < otro_robot.unique_id):
+                                # Debe ceder el otro robot porque tiene el id mas grande
+                                print("==========================================")
+                                print("COLISION EN EL CASO 3.3.2")
+                                print("==========================================")
+                                if indice_colision > 0:
+                                    posicion_freno = otro_robot.ruta_planeada[indice_colision - 1]
+                                else:
+                                    posicion_freno = otro_robot.ruta_planeada[indice_colision]
+                                otro_robot.ruta_planeada.insert(indice_colision, posicion_freno)
+                                # otro_robot.ruta_planeada = otro_robot.replanificacion_a_estrella(otro_robot.pos, otro_robot.ruta_planeada[-1], colision)
+                                otro_robot.contador_replanificaciones += 1
+                                otro_robot.comunicar_ruta()
+                                return
+                            else:
+                                # Debe ceder el robot actual porque tiene el id mas grande
+                                print("==========================================")
+                                print("COLISION EN EL CASO 3.3.2")
+                                print("==========================================")
+                                if indice_colision > 0:
+                                    posicion_freno = self.ruta_planeada[indice_colision - 1]
+                                else:
+                                    posicion_freno = self.ruta_planeada[indice_colision]
+                                self.ruta_planeada.insert(indice_colision, posicion_freno)
+                                # self.ruta_planeada = self.replanificacion_a_estrella(self.pos, self.ruta_planeada[-1], colision)
+                                self.contador_replanificaciones += 1
+                                self.comunicar_ruta()
+                                return
+                            
+            return
+            
+
         def esperar_o_cambiar_ruta(self):
             # Ejemplo: el robot podría esperar un tiempo antes de replanificar
             self.esperar()
@@ -463,12 +953,15 @@ class RobotLimpieza(Agent):
 
         def detectar_colision(self, ruta_otro_robot):
             # Simple chequeo de colisión
+            # indice 0: indica si hubo colision o no
+            # indice 1: indice donde ocurre la colision
+            # indice 2: lugar donde ocurre la colision
 
             for idx in range(min(len(self.ruta_planeada), len(ruta_otro_robot))):
                 if ruta_otro_robot[idx] == self.ruta_planeada[idx]:
-                    return True
+                    return [True, idx, self.ruta_planeada[idx]]
             
-            return False
+            return [False, None, None]
 
 
         def ir_a_estacion_carga(self):
@@ -604,6 +1097,7 @@ class RobotLimpieza(Agent):
                 if actual == destino:
                     break
 
+                # Mandar a obtener_vecinos() las coordenadas donde ocurre la colision
                 for siguiente in self.obtener_vecinos(actual, destino):
                     nuevo_costo = costo_hasta_ahora[actual] + 1  # Assuming a uniform cost
                     if siguiente not in costo_hasta_ahora or nuevo_costo < costo_hasta_ahora[siguiente]:
@@ -626,6 +1120,7 @@ class RobotLimpieza(Agent):
 
 
         def obtener_vecinos(self, pos, destino):
+            # Agregar la posicion en coordenadas donde ocurre colision
             vecinos = []
 #            direcciones = [(0, 1), (1, 0), (0, -1), (-1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]  # Movimientos posibles
             direcciones = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # Movimientos posibles
@@ -633,9 +1128,12 @@ class RobotLimpieza(Agent):
             for dx, dy in direcciones:
                 x, y = pos[0] + dx, pos[1] + dy
                 if 0 <= x < self.model.grid.width and 0 <= y < self.model.grid.height:
+                    # Las celdas vecinas deben estar vacias y no pueden ser la posicion donde ocurre una colision
+                    # Si hay una celda vacia solo se agrega como si no es una celda de colision
                     if self.is_cell_empty((x, y)):
                         vecinos.append((x, y))
                         continue
+                    
                     
             return vecinos
 
@@ -674,6 +1172,51 @@ class RobotLimpieza(Agent):
                     return False
 
             return True  # La celda contiene agentes, pero son del tipo no bloqueante
+        
+        def replanificacion_a_estrella(self, inicio, destino, colision):
+            frontera = PriorityQueue()
+            frontera.put((0, inicio))
+            camino = {inicio: None}
+            costo_hasta_ahora = {inicio: 0}
+
+            while not frontera.empty():
+                _, actual = frontera.get()
+
+                if actual == destino:
+                    break
+
+                # Mandar a obtener_vecinos() las coordenadas donde ocurre la colision
+                for siguiente in self.replanificacion_obtener_vecinos(actual, destino, colision):
+                    nuevo_costo = costo_hasta_ahora[actual] + 1  # Assuming a uniform cost
+                    if siguiente not in costo_hasta_ahora or nuevo_costo < costo_hasta_ahora[siguiente]:
+                        costo_hasta_ahora[siguiente] = nuevo_costo
+                        prioridad = nuevo_costo + self.heuristica(siguiente, destino)
+                        frontera.put((prioridad, siguiente))
+                        camino[siguiente] = actual
+
+            #checar si en la ultima posicion del camino hay un robot
+            # if not self.model.grid.is_cell_empty(destino):
+            #     camino.pop(destino)
+
+            return self.reconstruir_camino(camino, inicio, destino)
+        
+        def replanificacion_obtener_vecinos(self, pos, destino, colision):
+            # Agregar la posicion en coordenadas donde ocurre colision
+            vecinos = []
+#            direcciones = [(0, 1), (1, 0), (0, -1), (-1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]  # Movimientos posibles
+            direcciones = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # Movimientos posibles
+
+            for dx, dy in direcciones:
+                x, y = pos[0] + dx, pos[1] + dy
+                if 0 <= x < self.model.grid.width and 0 <= y < self.model.grid.height:
+                    # Las celdas vecinas deben estar vacias y no pueden ser la posicion donde ocurre una colision
+                    # Si hay una celda vacia solo se agrega como si no es una celda de colision
+                    if self.is_cell_empty((x, y)) and (x, y) != colision[2]:
+                        vecinos.append((x, y))
+                        continue
+                    
+                    
+            return vecinos
 
 class Habitacion(Model):
       def __init__(self, M: int, N: int,
