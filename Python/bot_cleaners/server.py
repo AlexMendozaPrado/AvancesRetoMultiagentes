@@ -12,12 +12,14 @@ def agent_portrayal(agent):
         portrayal = {"Shape": "circle", "Filled": "true", "Color": "black", "Layer": 0, "r": 1.0}
         if agent.tiene_caja:
             portrayal["Color"] = "black"
-            portrayal["text"] = "🤖📦"
+            #portrayal["text"] = "🤖📦"
+            portrayal["text_color"] = "white"
+            portrayal["text"] = f"🤖{agent.unique_id}"
 
         else:
             portrayal["Color"] = "black"
             portrayal["text_color"] = "white"
-            portrayal["text"] = f"🤖{agent.carga}"
+            portrayal["text"] = f"🤖{agent.unique_id}"
             
             #portrayal["text"] = f"{agent.unique_id}"
         return portrayal

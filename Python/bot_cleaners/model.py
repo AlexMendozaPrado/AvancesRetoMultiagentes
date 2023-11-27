@@ -112,6 +112,17 @@ class RobotLimpieza(Agent):
                     break  # Suponiendo que solo hay una celda en la posición
 
         def step(self):
+
+            """
+            for robot in self.model.schedule.agents:
+                if isinstance(robot, RobotLimpieza):
+                    print(robot.unique_id, " - ", robot.ruta_planeada)
+
+            print("======================================")
+            print("======================================")
+            print("======================================")
+            """
+
             # Si el robot está cargando, incrementar la batería
             if self.estoy_cargando() == True:
                 self.carga = min(100, self.carga + 25)  # Suponiendo que se carga un 25% por step
@@ -227,7 +238,7 @@ class RobotLimpieza(Agent):
                 # No se cumple ninguna de las sigueientes condiciones cuando no hay colisiones
                 if len(total_colisiones) == 1:
                     # la nueva ruta provoca una colision, se puede negociar con el otro robot que provoca colision
-                    replanificar_robot = self.negociar(total_colisiones[0][0])
+                    replanificar_robot = self.negociar(total_colisiones[0][0], total_colisiones)
                     if replanificar_robot != self:
                         total_colisiones[0][0] = self # colision desde el punto de vista del otro robot
                     replanificar_robot.planificar_nueva_ruta(total_colisiones)
@@ -430,7 +441,7 @@ class RobotLimpieza(Agent):
             elif any(estacion for estacion in self.model.estaciones_carga if estacion.pos in ruta_otro_robot and estacion.reservada and estacion.robot_reservante == self):
                 self.resolver_conflicto(otro_robot)  # Considerar esto como un conflicto y replanificar la ruta
 
-        def negociar(self, otro_robot):
+        def negociar(self, otro_robot, total_colisiones):
             
             """
             if self.estacion_reservada and self.estacion_reservada.reservada and self.estacion_reservada.robot_reservante != self:
@@ -517,12 +528,15 @@ class RobotLimpieza(Agent):
                     # Debe ceder el otro robot (esta desocupado)
                     print("==========================================")
                     print("COLISION EN EL CASO 1.1")
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                     print("==========================================")
                     return otro_robot
                 elif ((otro_robot.ruta_planeada[-1] == otro_robot.estacion_carga_propia.pos) and (self.ruta_planeada[-1] != self.estacion_carga_propia.pos) and (self.tiene_caja == False)):
                     # Debe ceder el robot actual (esta desocupado)
                     print("==========================================")
                     print("COLISION EN EL CASO 1.1")
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                     print("==========================================")
                     return self
                 
@@ -531,12 +545,16 @@ class RobotLimpieza(Agent):
                     # Debe ceder el robot actual porque el otro tiene caja
                     print("==========================================")
                     print("COLISION EN EL CASO 1.2")
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                     print("==========================================")
                     return self
                 elif((otro_robot.ruta_planeada[-1] == otro_robot.estacion_carga_propia.pos) and (self.ruta_planeada[-1] != self.estacion_carga_propia.pos) and (self.tiene_caja == True)):
                     # Debe ceder el otro robot porque el actual tiene caja
                     print("==========================================")
                     print("COLISION EN EL CASO 1.2")
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                     print("==========================================")
                     return otro_robot
                 
@@ -547,12 +565,16 @@ class RobotLimpieza(Agent):
                         # Debe ceder el otro robot porque el actual tiene menos bateria
                         print("==========================================")
                         print("COLISION EN EL CASO 1.3.1")
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                         print("==========================================")
                         return otro_robot
                     elif (self.carga > otro_robot.carga):
                         # Debe ceder el robot actual porque el otro tiene menos bateria
                         print("==========================================")
                         print("COLISION EN EL CASO 1.3.1")
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                         print("==========================================")
                         return self
 
@@ -563,12 +585,16 @@ class RobotLimpieza(Agent):
                             # Debe ceder el robot actual porque el otro tiene mas replanificaciones
                             print("==========================================")
                             print("COLISION EN EL CASO 1.3.2")
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                             print("==========================================")
                             return self
                         elif (self.contador_replanificaciones > otro_robot.contador_replanificaciones):
                             # Debe ceder el otro robot porque el actual tiene mas replanificaciones
                             print("==========================================")
                             print("COLISION EN EL CASO 1.3.2")
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                             print("==========================================")
                             return otro_robot
                         
@@ -578,12 +604,16 @@ class RobotLimpieza(Agent):
                                 # Debe ceder el otro robot porque tiene el id mas grande
                                 print("==========================================")
                                 print("COLISION EN EL CASO 1.3.2.2")
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                                 print("==========================================")
                                 return otro_robot
                             else:
                                 # Debe ceder el robot actual porque tiene el id mas grande
                                 print("==========================================")
                                 print("COLISION EN EL CASO 1.3.2.2")
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                                 print("==========================================")
                                 return self
 
@@ -594,12 +624,16 @@ class RobotLimpieza(Agent):
                     # Debe ceder el otro robot porque el actual tiene la caja mas pesada
                     print("==========================================")
                     print("COLISION EN EL CASO 2.1")
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                     print("==========================================")
                     return otro_robot
                 elif (self.caja_cargando.peso < otro_robot.caja_cargando.peso):
                     # Debe ceder el robot actual porque el otro tiene la caja mas pesada
                     print("==========================================")
                     print("COLISION EN EL CASO 2.1")
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                     print("==========================================")
                     return self
                 
@@ -611,12 +645,16 @@ class RobotLimpieza(Agent):
                         # Debe ceder el otro robot porque el actual tiene menos bateria
                         print("==========================================")
                         print("COLISION EN EL CASO 2.2.1")
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                         print("==========================================")
                         return otro_robot
                     elif (self.carga > otro_robot.carga):
                         # Debe ceder el robot actual porque el otro tiene menos bateria
                         print("==========================================")
                         print("COLISION EN EL CASO 2.2.1")
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                         print("==========================================")
                         return self
                     
@@ -627,12 +665,16 @@ class RobotLimpieza(Agent):
                             # Debe ceder el robot actual porque el otro tiene mas replanificaciones
                             print("==========================================")
                             print("COLISION EN EL CASO 2.2.2.1")
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                             print("==========================================")
                             return self
                         elif (self.contador_replanificaciones > otro_robot.contador_replanificaciones):
                             # Debe ceder el otro robot porque el actual tiene mas replanificaciones
                             print("==========================================")
                             print("COLISION EN EL CASO 2.2.2.1")
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                             print("==========================================")
                             return otro_robot
                         
@@ -642,12 +684,16 @@ class RobotLimpieza(Agent):
                                 # Debe ceder el otro robot porque tiene el id mas grande
                                 print("==========================================")
                                 print("COLISION EN EL CASO 2.2.2.2")
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                                 print("==========================================")
                                 return otro_robot
                             else:
                                 # Debe ceder el robot actual porque tiene el id mas grande
                                 print("==========================================")
                                 print("COLISION EN EL CASO 2.2.2.2")
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                                 print("==========================================")
                                 return self
 
@@ -658,12 +704,16 @@ class RobotLimpieza(Agent):
                     # Debe ceder el otro robot porque el actual esta cargando una caja
                     print("==========================================")
                     print("COLISION EN EL CASO 3.1")
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                     print("==========================================")
                     return otro_robot
                 elif(self.tiene_caja == False and otro_robot.tiene_caja == True):
                     # Debe ceder el robot actual porque el otro esta cargando una caja
                     print("==========================================")
                     print("COLISION EN EL CASO 3.1")
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                    print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                     print("==========================================")
                     return self
 
@@ -673,12 +723,16 @@ class RobotLimpieza(Agent):
                         # Debe ceder el otro robot porque el actual tiene menos bateria
                         print("==========================================")
                         print("COLISION EN EL CASO 3.2")
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                         print("==========================================")
                         return otro_robot
                     elif (self.carga > otro_robot.carga):
                         # Debe ceder el robot actual porque el otro tiene menos bateria
                         print("==========================================")
                         print("COLISION EN EL CASO 3.2")
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                        print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                         print("==========================================")
                         return self
 
@@ -689,12 +743,16 @@ class RobotLimpieza(Agent):
                             # Debe ceder el robot actual porque el otro tiene mas replanificaciones
                             print("==========================================")
                             print("COLISION EN EL CASO 3.3.1")
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                             print("==========================================")
                             return self
                         elif (self.contador_replanificaciones > otro_robot.contador_replanificaciones):
                             # Debe ceder el otro robot porque el actual tiene mas replanificaciones
                             print("==========================================")
                             print("COLISION EN EL CASO 3.3.1")
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                            print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                             print("==========================================")
                             return otro_robot
                         
@@ -704,12 +762,16 @@ class RobotLimpieza(Agent):
                                 # Debe ceder el otro robot porque tiene el id mas grande
                                 print("==========================================")
                                 print("COLISION EN EL CASO 3.3.2")
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                                 print("==========================================")
                                 return otro_robot
                             else:
                                 # Debe ceder el robot actual porque tiene el id mas grande
                                 print("==========================================")
                                 print("COLISION EN EL CASO 3.3.2")
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id)
+                                print("Robot", self.unique_id, "y", otro_robot.unique_id, "-", total_colisiones[0][1])
                                 print("==========================================")
                                 return self    
 
@@ -783,6 +845,17 @@ class RobotLimpieza(Agent):
                 if (0 <= self.sig_pos[0] < self.model.grid.width and
                     0 <= self.sig_pos[1] < self.model.grid.height):
                     self.model.grid.move_agent(self, self.sig_pos)
+
+                    for robot in self.model.schedule.agents:
+                        if robot != self and isinstance(robot, RobotLimpieza):
+                            # Comparar ruta del robot actual con la ruta de otros robots
+                            max_length = min(len(self.ruta_planeada), len(robot.ruta_planeada)) - 1
+                            for i in range(max_length):
+                                if self.ruta_planeada[i] == robot.ruta_planeada[i]:
+                                    print("=======================================")
+                                    print("Colision entre el Robot", self.unique_id, "y", robot.unique_id, "-", robot.ruta_planeada[i], "-", self.ruta_planeada[i])
+                                    print("=======================================")
+
                     # Reducir la batería por movimiento
                     if self.tiene_caja:
                         self.carga -= self.caja_cargando.peso
@@ -976,6 +1049,9 @@ class RobotLimpieza(Agent):
             return True  # La celda contiene agentes, pero son del tipo no bloqueante
         
         def replanificacion_a_estrella(self, inicio, destino, total_colisiones):
+            print("==========================================")
+            print("Replanificando A*")
+            print("==========================================")
             frontera = PriorityQueue()
             frontera.put((0, inicio))
             camino = {inicio: None}
@@ -1000,6 +1076,10 @@ class RobotLimpieza(Agent):
             # if not self.model.grid.is_cell_empty(destino):
             #     camino.pop(destino)
 
+            print("=================================================")
+            print("Ruta constrida")
+            print(self.reconstruir_camino(camino, inicio, destino))
+            print("=================================================")
             return self.reconstruir_camino(camino, inicio, destino)
         
         def replanificacion_obtener_vecinos(self, pos, destino, total_colisiones):
@@ -1057,10 +1137,24 @@ class RobotLimpieza(Agent):
 
             if len(nuevas_colisiones) == 0 and len(nueva_ruta) > 0:
                 # Se encontro una ruta sin colisiones
+                
+                for i in range(len(nuevas_colisiones)):
+                    cell_contents = self.grid.get_cell_list_contents(nuevas_colisiones[i][1])
+                    for agent in cell_contents:
+                        if isinstance(agent, (Caja, Estante)) or (isinstance(agent, RobotLimpieza) and agent.unique_id != self.unique_id) or (isinstance(agent, EstacionCarga) and agent.unique_id != self.estacion_carga_propia.unique_id):
+                            print("===========================================")
+                            print("LA POSICION", nuevas_colisiones[i][1], "DE LA RUTA FINAL YA SE ENCUENTRA OCUPADA")
+                            print("===========================================")
+
                 self.ruta_planeada = nueva_ruta
             elif len(nueva_ruta) == 0:
                 # No se encontro una ruta sin colisiones, el robot debe esperar en su posicion actual hasta el proximo step
                 self.ruta_planeada = [self.pos]
+
+            print("===========================================")
+            print("RUTA TERMINADA")
+            print(self.ruta_planeada)
+            print("===========================================")
 
 class Habitacion(Model):
       def __init__(self, M: int, N: int,
