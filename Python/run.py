@@ -1,3 +1,4 @@
-from bot_cleaners.server import server
+from bot_cleaners.server import app
 
-server.launch(open_browser=True)
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
