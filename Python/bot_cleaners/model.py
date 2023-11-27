@@ -489,10 +489,7 @@ class RobotLimpieza(Agent):
                     0 <= self.sig_pos[1] < self.model.grid.height):
                     self.model.grid.move_agent(self, self.sig_pos)
                     # Reducir la batería por movimiento
-                    if self.tiene_caja:
-                        self.carga -= self.caja_cargando.peso
-                    else:
-                        self.carga -= 1
+                    self.carga -= 1
                 else:
                     print(f"Posición inválida: {self.sig_pos}")
 
@@ -715,7 +712,7 @@ class Habitacion(Model):
         # Iniciar cajas
           
       def iniciar_bandas_entrega(self):
-            posiciones_banda_entrega = [(3,0), (5,0), (7,0), (9,0), (11,0)]
+            posiciones_banda_entrega = [(6,0), (8,0), (10,0), (12,0), (14,0)]
             for pos in posiciones_banda_entrega:
                 banda = BandaEntrega(self.next_id(), self)
                 self.grid.place_agent(banda, pos)
@@ -765,12 +762,12 @@ class Habitacion(Model):
               self.schedule.add(robot)      
 
       def iniciar_cargadores(self):
-          pos_y_cargador = 11
+          pos_y_cargador = 14
           for i in range(self.num_agentes):
               if i % 2 == 0:
                   pos = (0, pos_y_cargador)
               else:
-                  pos = (14, pos_y_cargador)
+                  pos = (20, pos_y_cargador)
                   pos_y_cargador -= 2
 
               cargador = EstacionCarga(self.next_id(), self)
@@ -778,18 +775,18 @@ class Habitacion(Model):
               self.grid.place_agent(cargador, pos)
 
       def iniciar_estantes(self):
-          x = 3
+          x = 6
           y = 0
           if self.num_estantes > 10:
-              y = 10
+              y = 13
           elif self.num_estantes > 5 and self.num_estantes <= 10: 
-              y = 9
+              y = 12
           else:
-              y = 7
+              y = 10
 
           for i in range(self.num_estantes):
               if i % 5 == 0 and i != 0:
-                  x = 3
+                  x = 6
                   y -= 3
               pos = (x, y)
               estante = Estante(self.next_id(), self, pos)
@@ -806,7 +803,7 @@ class Habitacion(Model):
         #       self.estantes.append(estante)
       
       def iniciar_bandas(self):
-          posiciones_banda_entrada = [(3,14), (5,14), (7,14), (9,14), (11,14)]
+          posiciones_banda_entrada = [(6,20), (8,20), (10,20), (12,20), (14,20)]
           for pos in posiciones_banda_entrada:
               banda = Banda(self.next_id(), self)
               self.grid.place_agent(banda, pos)
@@ -870,7 +867,8 @@ class Habitacion(Model):
                     'id': agent.unique_id,
                     'carga': agent.carga,
                     'tiene_caja': agent.tiene_caja,
-                    'posicion': agent.pos
+                    'posicion': agent.pos,
+                    'id_caja': agent.caja_cargando.unique_id if agent.caja_cargando else None,
                 } for agent in model.schedule.agents if isinstance(agent, RobotLimpieza)
             ]
 
@@ -879,6 +877,7 @@ class Habitacion(Model):
                 {
                     'id': agent.unique_id,
                     'cantidad_cajas': agent.cantidad_cajas,
+                    'cajas': [{"id_caja": caja.unique_id} for caja in agent.cajas],
                     'posicion': agent.pos
                 } for agent in self.estantes
             ]
@@ -888,7 +887,8 @@ class Habitacion(Model):
                 {
                     'id': banda.unique_id,
                     'posicion': banda.pos,
-                    'tiene_caja': banda.tiene_caja
+                    'tiene_caja': banda.tiene_caja,
+                    'id_caja': banda.caja_recoger.unique_id if banda.caja_recoger else None,
                 } for banda in self.bandas
             ]
       

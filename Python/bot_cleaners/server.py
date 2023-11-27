@@ -121,7 +121,6 @@ def get_new_grid():
 def start_simulation():
     global model, grid
     # Creación del servidor de visualización de Mesa
-    send_data = {}
     if model is not None:
         data = model.get_grid()
         grid = data
@@ -133,6 +132,7 @@ def new_step():
     global model, grid
     if model is not None:
         data = model.get_step_info()
+        print(data["robots"])
         model.step()
 
     return jsonify(data), 200
