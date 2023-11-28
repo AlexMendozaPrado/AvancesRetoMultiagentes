@@ -916,6 +916,7 @@ class Habitacion(Model):
                     'id_cajas': [{"id": caja.unique_id} for caja in banda.cajas]
                 } for banda in self.bandas_entrega
             ]
+      
 
       def get_step_info(self):
           data ={"robots": self.get_robots_info(self),
