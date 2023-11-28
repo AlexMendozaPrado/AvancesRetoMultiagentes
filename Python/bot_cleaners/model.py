@@ -54,6 +54,7 @@ class BandaEntrega(Agent):
     def __init__(self, unique_id: int, model: Model) -> None:
         super().__init__(unique_id, model)
         self.cantidad_cajas = 0
+        self.cajas = []
 
         
 
@@ -209,6 +210,7 @@ class RobotLimpieza(Agent):
                     else:
                         banda_entrega = self.obtener_banda_entrega(self.caja_cargando.id_entrega)
                         if self.son_vecinos_ortogonales(banda_entrega):
+                            banda_entrega.cajas.append(self.caja_cargando)
                             self.tiene_caja = False
                             self.caja_cargando = None
                             banda_entrega.cantidad_cajas += 1
@@ -702,7 +704,7 @@ class Habitacion(Model):
           self.num_estantes = num_estantes
           self.yendo_cargador = False
           self.cajas_creadas = 0
-
+          self.run = True
           self.iniciar_bandas()
           self.iniciar_bandas_entrega()
           self.iniciar_estantes()
@@ -722,11 +724,24 @@ class Habitacion(Model):
       def get_grid(self):
             return self.get_step_info()
 
-
        
       def poner_caja(self, pos, caja):
             # self.grid.place_agent(caja, pos)
             self.schedule.add(caja)
+
+      def continue_running(self):
+          cajas_entregadas = 0;
+          for banda in self.bandas_entrega:
+              cajas_entregadas += banda.cantidad_cajas
+          
+          robots_todos_cargando = 0
+          for robot in self.schedule.agents:
+              if isinstance(robot, RobotLimpieza):
+                  if robot.pos == robot.estacion_carga_propia.pos or robot.carga == 100:
+                      robots_todos_cargando += 1
+
+          if(cajas_entregadas == self.cajas_creadas and robots_todos_cargando == self.num_agentes):
+              self.run = False
 
       def crear_caja(self):
           if self.num_cajas <= 0:
@@ -897,7 +912,8 @@ class Habitacion(Model):
                 {
                     'id': banda.unique_id,
                     'posicion': banda.pos,
-                    'cantidad_cajas': banda.cantidad_cajas
+                    'cantidad_cajas': banda.cantidad_cajas,
+                    'id_cajas': [{"id": caja.unique_id} for caja in banda.cajas]
                 } for banda in self.bandas_entrega
             ]
 
@@ -911,6 +927,7 @@ class Habitacion(Model):
 
       def step(self):
           self.schedule.step()
+          self.continue_running()
 
       def todoLimpio(self):
             for (content, x, y) in self.grid.coord_iter():
