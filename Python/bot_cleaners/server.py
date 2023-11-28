@@ -26,6 +26,7 @@ def agent_portrayal(agent):
             portrayal["Color"] = "black"
             portrayal["text_color"] = "white"
             portrayal["text"] = f"{agent.unique_id}"
+            portrayal["text"] = f"{agent.unique_id}"
             #portrayal["text"] = f"{agent.unique_id}"
         return portrayal
     elif isinstance(agent, Mueble):
