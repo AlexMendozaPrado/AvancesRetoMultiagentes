@@ -26,6 +26,7 @@ def agent_portrayal(agent):
             portrayal["Color"] = "black"
             portrayal["text_color"] = "white"
             portrayal["text"] = f"{agent.unique_id}"
+            portrayal["text"] = f"{agent.unique_id}"
             #portrayal["text"] = f"{agent.unique_id}"
         return portrayal
     elif isinstance(agent, Mueble):
@@ -79,10 +80,12 @@ def agent_portrayal(agent):
 
 # Creación del grid para la visualización
 model = None
+grid = []
+steps = []
 
 @app.route('/start-simulation', methods=['POST'])
 def receive_data():
-    global NUMBER_ROBOTS, NUMBER_SHELFS, NUMBER_BOXES, model
+    global NUMBER_ROBOTS, NUMBER_SHELFS, NUMBER_BOXES, model, steps, grid
 
     # Verificar si el cuerpo de la solicitud es JSON
     if not request.is_json:
@@ -105,14 +108,42 @@ def receive_data():
 
     # Creación del servidor de visualización de Mesa
     model = Habitacion(**model_params)
+    steps.clear()
+    grid.clear()
+    grid = model.get_grid()
+    while(model.run):
+        model.step()
+        steps.append(model.get_step_info())
 
     return "Submit data", 200
 
-@app.route('/start-simulation', methods=['GET'])
+@app.route('/new-grid', methods=['POST'])
+def get_new_grid():
+    global grid
+    request_data = request.get_json()
+    print(request_data)
+    grid = request_data["grid"]
+    return "Submit data", 200
+
+@app.route('/get-grid', methods=['GET'])
 def start_simulation():
-    global model
+    global model, grid
     # Creación del servidor de visualización de Mesa
+    if grid != []:
+        return jsonify(grid), 200
+    else:
+        return jsonify({"message": "there's no grid"}), 200
+
+@app.route('/new-step', methods=['GET'])
+def new_step():
+    global model, steps
+
     data = None
+    data_terminado = {
+        "terminado": True
+    }
+
     if model is not None:
-        data = model.datacollector.get_starting_grid()
-    return "Start simulation", 200
+        data = steps.pop(0) if len(steps) > 0 else data_terminado
+
+    return jsonify(data), 200
