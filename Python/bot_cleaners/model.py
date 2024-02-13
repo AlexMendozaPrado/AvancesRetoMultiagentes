@@ -6,7 +6,7 @@ from mesa.datacollection import DataCollector
 from collections import deque
 import math
 import random
-import requests
+
 
 
 import numpy as np
@@ -35,11 +35,6 @@ class Estante(Agent):
 
         #TODO: pop caja cuando la recogen
 
-class BandaEntrega(Agent):
-    def __init__(self,unique_id,model):
-        super().__init__(unique_id,model)
-        self.cantidad_caja = 0
-
 class Banda(Agent):
     def __init__(self,unique_id,model):
         super().__init__(unique_id,model)
@@ -59,10 +54,8 @@ class BandaEntrega(Agent):
     def __init__(self, unique_id: int, model: Model) -> None:
         super().__init__(unique_id, model)
         self.cantidad_cajas = 0
-        self.cajas = []
 
         
-
 
 class EstacionCarga(Agent):
       def __init__(self, unique_id, model):
@@ -120,6 +113,16 @@ class RobotLimpieza(Agent):
 
         def step(self):
 
+            """
+            for robot in self.model.schedule.agents:
+                if isinstance(robot, RobotLimpieza):
+                    print(robot.unique_id, " - ", robot.ruta_planeada)
+
+            print("======================================")
+            print("======================================")
+            print("======================================")
+            """
+
             # Si el robot está cargando, incrementar la batería
             if self.estoy_cargando() == True:
                 self.carga = min(100, self.carga + 25)  # Suponiendo que se carga un 25% por step
@@ -167,37 +170,20 @@ class RobotLimpieza(Agent):
                     self.pos_estante_recogida = pos_estante
                     self.caja_estante_recogida = caja
                     return
-            # Planificar ruta hacia celda sucia si no hay ruta planeada
-            if not self.ruta_planeada:
-                # TODO: Robot mas cercano se dirige a la banda de su ID
-                # Busca la banda con el mismo ID que el robot
-                # Imprime todos los ids de las bandas
-
-                # Reiniciar su contador de replanificaciones
-                self.contador_replanificaciones = 0
-                
-                if not self.tiene_caja: # no tiene caja, se dirije a la banda
-                    #verificar si puede hacer todo el recorrido
-                    if self.dejando_caja:
-                        pos_estante = np.random.choice(self.pos_estantes_recojer)
-                        self.pos_estantes_recojer.remove(pos_estante)
-                        self.ruta_planeada = self.algoritmo_a_estrella(self.pos, pos_estante[0])
-                        return
-
-            # Planificar ruta hacia celda sucia si no hay ruta planeada
+ 
             if not self.ruta_planeada:
                 if not self.tiene_caja: 
+                    # Se regresa a su estacion de carga porque no tiene suficiente bateria para hacer el recorrido
                     if not self.puede_hacer_el_recorrido():
                         self.ruta_planeada = self.algoritmo_a_estrella(self.pos, self.estacion_carga_propia.pos)
                         self.verificar_nueva_ruta()
                         return
                     
+                    # Ir a la banda a buscar una nueva caja
                     if not self.dejando_caja:
                         for banda in self.model.bandas:
                             if banda.unique_id == self.banda_id:
-                                # Cambia banda.pos en y-1
-                                punto_recoleccion = (banda.pos[0], banda.pos[1] - 1)
-                                ##Verificar si robot tiene bateri disponible para ir por 
+                                punto_recoleccion = (banda.pos[0], banda.pos[1] - 1) # Debe recoger la caja abajo de la banda, no encima
                                 self.ruta_planeada = self.algoritmo_a_estrella(self.pos, punto_recoleccion)
                                 break
 
@@ -234,7 +220,6 @@ class RobotLimpieza(Agent):
                     else:
                         banda_entrega = self.obtener_banda_entrega(self.caja_cargando.id_entrega)
                         if self.son_vecinos_ortogonales(banda_entrega):
-                            banda_entrega.cajas.append(self.caja_cargando)
                             self.tiene_caja = False
                             self.caja_cargando = None
                             banda_entrega.cantidad_cajas += 1
@@ -244,8 +229,6 @@ class RobotLimpieza(Agent):
                 #si tiene batteria para ir por la caja, dejarla, y luego cargarse, ir por la caja, si no cargarse
                 # self.comunicar_ruta()
                 self.verificar_nueva_ruta()
-
-                self.comunicar_ruta()
 
             else:
                 if self.tiene_caja:
@@ -307,21 +290,6 @@ class RobotLimpieza(Agent):
             self.all_robots_cargadores = True
             return True
 
-        def obtener_banda_entrega(self, id_banda_entrega):
-            for banda in self.model.bandas_entrega:
-                if banda.unique_id == id_banda_entrega:
-                    return banda
-            return None
-
-        def verificar_cargadores(self):
-            for robot in self.model.schedule.agents:
-                if isinstance(robot, RobotLimpieza):
-                    if robot.pos != robot.estacion_carga_propia.pos or robot.carga != 100:
-                        self.all_robots_cargadores = False
-                        return False
-            self.all_robots_cargadores = True
-            return True
-
         def checar_empezar_recoleccion(self):
             cantidad_cajas = 0
             for estante in self.model.estantes:
@@ -341,7 +309,7 @@ class RobotLimpieza(Agent):
             ruta_banda_estante = self.algoritmo_a_estrella(punto_banda, punto_estante_entrega)
             ruta_estante_cargador = self.algoritmo_a_estrella(punto_estante_entrega, self.estacion_carga_propia.pos)
 
-            costo_total = len(ruta_hacia_banda) + len(ruta_banda_estante) + len(ruta_estante_cargador)
+            costo_total = len(ruta_hacia_banda) + (len(ruta_banda_estante) * caja.peso) + len(ruta_estante_cargador)
             if costo_total > self.carga:
                 return False
             print("Robot ", self.unique_id, " puede hacer el recorrido ", costo_total, " bateria disponible ", self.carga)
@@ -442,7 +410,6 @@ class RobotLimpieza(Agent):
 
         def recibir_ruta(self, ruta_otro_robot, otro_robot):
             # Detectar colisión y negociar una nueva ruta si es necesario
-
             # colision[0]: indica si hubo colision o no
             # colision[1]: indice donde ocurre la colision
             # colision[2]: lugar donde ocurre la colision
@@ -465,7 +432,7 @@ class RobotLimpieza(Agent):
             print("Robot actual:", self.unique_id)
             print("Otro robot:", otro_robot.unique_id)
             print("==========================================")
-            
+
             """
             if self.estacion_reservada and self.estacion_reservada.reservada and self.estacion_reservada.robot_reservante != self:
                 # Si la estación de carga está reservada por otro robot, replanificar sin incrementar el contador
@@ -522,6 +489,7 @@ class RobotLimpieza(Agent):
             recoge su caja no puede moverse porque el robot de atras esta ocupando su espacio y ese robot necesita recoger una caja
             de la banda. En este caso no funciona el frenado de uno de los 2 robots, se necesita replanificar las rutas de ambos 
             ignorando las posiciones ocupadas del mapa.
+
             
             Hay 2 robots:
             * 1. Esta en cualquier estado (cargando, yendo a recoger una caja o yendo a su estacion de carga)
@@ -872,7 +840,8 @@ class RobotLimpieza(Agent):
 
             for idx in range(min(len(self.ruta_planeada), len(ruta_otro_robot))):
                 if ruta_otro_robot[idx] == self.ruta_planeada[idx]:
-                    return [True, idx, self.ruta_planeada[idx]]   
+                    return [True, idx, self.ruta_planeada[idx]]
+            
             return [False, None, None]
 
 
@@ -910,7 +879,10 @@ class RobotLimpieza(Agent):
                     self.model.grid.move_agent(self, self.sig_pos)
 
                     # Reducir la batería por movimiento
-                    self.carga -= 1
+                    if self.tiene_caja:
+                        self.carga -= self.caja_cargando.peso
+                    else:
+                        self.carga -= 1
                 else:
                     print(f"Posición inválida: {self.sig_pos}")
 
@@ -1093,7 +1065,7 @@ class RobotLimpieza(Agent):
 
             # Considera la celda "vacía" si solo contiene agentes que no bloquean el movimiento
             for agent in cell_contents:
-                if isinstance(agent, (Caja, Estante)) or (isinstance(agent, RobotLimpieza) and agent.unique_id != self.unique_id) or (isinstance(agent, EstacionCarga) and agent.unique_id != self.estacion_carga_propia.unique_id):
+                if isinstance(agent, (Caja, Estante)) or (isinstance(agent, Banda)) or (isinstance(agent, BandaEntrega)) or (isinstance(agent, RobotLimpieza) and agent.unique_id != self.unique_id) or (isinstance(agent, EstacionCarga) and agent.unique_id != self.estacion_carga_propia.unique_id):
                     return False
 
             return True  # La celda contiene agentes, pero son del tipo no bloqueante
@@ -1122,6 +1094,8 @@ class RobotLimpieza(Agent):
                         frontera.put((prioridad, siguiente))
                         camino[siguiente] = actual
 
+                
+
             #checar si en la ultima posicion del camino hay un robot
             # if not self.model.grid.is_cell_empty(destino):
             #     camino.pop(destino)
@@ -1145,7 +1119,8 @@ class RobotLimpieza(Agent):
                     # Si hay una celda vacia solo se agrega como vecina si no es una celda de colisiones
                     conflicto_en_celda = False
                     for colision in total_colisiones:
-                        if self.is_cell_empty((x, y)) and (x, y) == colision[1]:
+                        # si es una celda vacia de colision o si es una celda ocupada por otro agente
+                        if ((self.is_cell_empty((x, y)) and (x, y) == colision[1]) or (self.is_cell_empty((x, y)) == False)):
                             conflicto_en_celda = True
                             break
                     if conflicto_en_celda == False:
@@ -1166,28 +1141,71 @@ class RobotLimpieza(Agent):
             return colisiones
         
         def planificar_nueva_ruta(self, total_colisiones):
-            nueva_ruta = self.replanificacion_a_estrella(self.pos, self.ruta_planeada[-1], total_colisiones)
+            origen = self.pos
+            destino = self.ruta_planeada[-1]
+            nueva_ruta = self.replanificacion_a_estrella(origen, destino, total_colisiones)
             self.ruta_planeada = nueva_ruta
             nuevas_colisiones = self.obtener_colisiones()
             # Iterar mientras se obtenga una ruta con colisiones y la longitud de la ruta sea mayor que 0
             while len(nuevas_colisiones) > 0 and len(nueva_ruta) > 0:
                 # Agregar a todas las colisiones las nuevas colisiones encontradas
                 for colision in nuevas_colisiones:
-                    total_colisiones.append(colision)
+                    if colision not in total_colisiones:
+                        total_colisiones.append(colision)
 
                 # Buscar una nueva ruta omitiendo todas las colisiones
-                nueva_ruta = self.replanificacion_a_estrella(self.pos, self.ruta_planeada[-1], total_colisiones)
+                nueva_ruta = self.replanificacion_a_estrella(origen, destino, total_colisiones)
 
                 # Buscar las nuevas colisiones generadas por esa ruta
                 nuevas_colisiones = self.obtener_colisiones()
 
                 self.ruta_planeada = nueva_ruta
 
-                if len(nuevas_colisiones) == 1 and self.ruta_planeada[-1] == nuevas_colisiones[0][1]:
-                # La unica colision de la nueva ruta es su lugar destino (cinta o estante) que esta ocupado
-                # por otro robot, debe buscar el lugar de frenado optimo para no colisionar en la ruta destino
-                # ni para generar mas colisiones en otros lugares
-                    print("LA UNICA COLISION DE LA NUEVA RUTA ES SU LUGAR DESTINO")
+                """
+                all_collisions = []
+                for colision in total_colisiones:
+                    all_collisions.append(colision[1])
+
+                new_collisions = []
+                for collision in nuevas_colisiones:
+                    new_collisions.append(collision[1])
+
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                print("CANTIDAD DE COLISIONES RESTANTES:", len(nuevas_colisiones))
+                print("LA RUTA FINAL CALCULADA ES LA MISMA QUE LA INICIAL", self.ruta_planeada[-1] == destino)
+                print("LA RUTA FINAL ES UNA CELDA DE COLISION", destino in total_colisiones)
+                print("NUEVA RUTA CREADA", self.ruta_planeada)
+                print("TOTAL DE COLISIONES", all_collisions)
+                print("COLISIONES CREADAS POR LA NUEVA RUTA", new_collisions)
+                print("NUEVAS COLISIONES PELONAS", nuevas_colisiones)
+                print("PRIMER ORIGEN", origen)
+                print("SEGUNDO ORIGEN", self.ruta_planeada[0:2])
+                print("PRIMER DESTINO", destino)
+                print("SEGUNDO DESTINO", self.ruta_planeada[-1])
+                for robot in self.model.schedule.agents:
+                    if robot != self and isinstance(robot, RobotLimpieza):
+                        print(robot.ruta_planeada)
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                print("===============================================================")
+                """
+
+                if len(self.ruta_planeada) > 0:
+                    if len(nuevas_colisiones) == 1 and self.ruta_planeada[-1] == nuevas_colisiones[0][1]:
+                    # La unica colision de la nueva ruta es su lugar destino (cinta o estante) que esta ocupado
+                    # por otro robot, debe buscar el lugar de frenado optimo para no colisionar en la ruta destino
+                    # ni para generar mas colisiones en otros lugares
+                        print("LA UNICA COLISION DE LA NUEVA RUTA ES SU LUGAR DESTINO")
 
             self.contador_replanificaciones += 1
 
@@ -1268,12 +1286,12 @@ class Habitacion(Model):
           self.yendo_cargador = False
           self.cajas_creadas = 0
           self.run = True
+
           self.iniciar_bandas()
           self.iniciar_bandas_entrega()
           self.iniciar_estantes()
           self.iniciar_cargadores()
           self.iniciar_robots()
-
         # Iniciar cajas
           
       def iniciar_bandas_entrega(self):
@@ -1283,17 +1301,13 @@ class Habitacion(Model):
                 self.grid.place_agent(banda, pos)
                 self.schedule.add(banda)
                 self.bandas_entrega.append(banda)
-      
-      def get_grid(self):
-            return self.get_step_info()
 
-       
       def poner_caja(self, pos, caja):
             # self.grid.place_agent(caja, pos)
             self.schedule.add(caja)
 
       def continue_running(self):
-          cajas_entregadas = 0;
+          cajas_entregadas = 0
           for banda in self.bandas_entrega:
               cajas_entregadas += banda.cantidad_cajas
           
@@ -1341,7 +1355,6 @@ class Habitacion(Model):
 
       def iniciar_cargadores(self):
           pos_y_cargador = 18
-
           for i in range(self.num_agentes):
               if i % 2 == 0:
                   pos = (0, pos_y_cargador)
@@ -1366,7 +1379,6 @@ class Habitacion(Model):
           for i in range(self.num_estantes):
               if i % 5 == 0 and i != 0:
                   x = 6
-
                   y -= 4
               pos = (x, y)
               estante = Estante(self.next_id(), self, pos)
@@ -1441,56 +1453,6 @@ class Habitacion(Model):
                     # Escoger una posición aleatoria de las disponibles
             return self.random.choice(posiciones_disponibles)
 
-      def get_robots_info(self, model: Model):
-            return [
-                {
-                    'id': agent.unique_id,
-                    'carga': agent.carga,
-                    'tiene_caja': agent.tiene_caja,
-                    'posicion': agent.pos,
-                    'id_caja': agent.caja_cargando.unique_id if agent.caja_cargando else None,
-                } for agent in model.schedule.agents if isinstance(agent, RobotLimpieza)
-            ]
-
-      def get_estantes_info(self):
-            return [
-                {
-                    'id': agent.unique_id,
-                    'cantidad_cajas': agent.cantidad_cajas,
-                    'cajas': [{"id_caja": caja.unique_id} for caja in agent.cajas],
-                    'posicion': agent.pos
-                } for agent in self.estantes
-            ]
-      
-      def get_bandas_arriba_info(self):
-            return [
-                {
-                    'id': banda.unique_id,
-                    'posicion': banda.pos,
-                    'tiene_caja': banda.tiene_caja,
-                    'id_caja': banda.caja_recoger.unique_id if banda.caja_recoger else None,
-                } for banda in self.bandas
-            ]
-      
-      def get_bandas_abajo_info(self):
-            return [
-                {
-                    'id': banda.unique_id,
-                    'posicion': banda.pos,
-                    'cantidad_cajas': banda.cantidad_cajas,
-                    'id_cajas': [{"id": caja.unique_id} for caja in banda.cajas]
-                } for banda in self.bandas_entrega
-            ]
-      
-
-      def get_step_info(self):
-          data ={"robots": self.get_robots_info(self),
-                                 "estantes": self.get_estantes_info(),
-                                 "bandas_arriba": self.get_bandas_arriba_info(),
-                                 "bandas_abajo": self.get_bandas_abajo_info(),
-                }
-          return data
-
       def step(self):
           self.schedule.step()
           self.continue_running()
@@ -1501,7 +1463,18 @@ class Habitacion(Model):
                         if isinstance(obj, Celda) and obj.sucia:
                             return False
             return True
-
+      @staticmethod
+      def get_grid(model: Model) -> np.ndarray:
+            grid = np.zeros((model.grid.width, model.grid.height))
+            for cell in model.grid.coord_iter():
+                cell_content, pos = cell
+                x, y = pos
+                for obj in cell_content:
+                    if isinstance(obj, RobotLimpieza):
+                       grid[x][y] = 2   
+                    elif isinstance(obj, Celda):
+                         grid[x][y] = int(obj.sucia)
+            return grid
       @staticmethod      
       def get_cargas(model: Model):
            return [(agent.unique_id, agent.carga) for agent in model.schedule.agents]
